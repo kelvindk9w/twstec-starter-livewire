@@ -1,0 +1,122 @@
+{
+    "$schema": "https://getcomposer.org/schema.json",
+    "name": "twstec/starter-livewire",
+    "type": "project",
+    "description": "TWS Laravel Starter Kit — starter Livewire: aplicativo Laravel 13 completo (painel do usuário em Livewire 4, autenticação com verificação em duas etapas, segurança e auditoria ligadas pelos pacotes) sobre os pacotes twstec/kit-*. Contas e API, uploads e o painel /admin são opcionais: escolha com `php artisan tws:install`.",
+    "keywords": [
+        "laravel",
+        "livewire",
+        "starter-kit",
+        "security",
+        "lgpd"
+    ],
+    "license": "MIT",
+    "homepage": "https://github.com/kelvindk9w/tws-laravel-starter-kit",
+    "support": {
+        "issues": "https://github.com/kelvindk9w/tws-laravel-starter-kit/issues",
+        "docs": "https://github.com/kelvindk9w/tws-laravel-starter-kit/tree/desenvolvimento/docs"
+    },
+    "require": {
+        "php": "^8.4",
+        "laravel/framework": "^13.17",
+        "laravel/horizon": "^5.48",
+        "laravel/tinker": "^3.0",
+        "livewire/livewire": "^4.4",
+        "spatie/laravel-backup": "^10.3",
+        "twstec/kit-accounts": "^2.0@beta",
+        "twstec/kit-admin": "^2.0@beta",
+        "twstec/kit-auth": "^2.0@beta",
+        "twstec/kit-foundation": "^2.0@beta",
+        "twstec/kit-uploads": "^2.0@beta"
+    },
+    "require-dev": {
+        "fakerphp/faker": "^1.23",
+        "laravel/pail": "^1.2.5",
+        "laravel/pao": "^1.0.6",
+        "laravel/pint": "^1.27",
+        "mockery/mockery": "^1.6",
+        "nunomaduro/collision": "^8.6",
+        "pestphp/pest": "^4.7",
+        "pestphp/pest-plugin-laravel": "^4.1",
+        "phpunit/phpunit": "^12.5.12",
+        "twstec/kit-installer": "^2.0@beta"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        },
+        "files": [
+            "app/Support/legacy-aliases.php",
+            "app/Support/optional-modules.php",
+            "app/Support/ui-helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "setup": [
+            "composer install",
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php artisan key:generate",
+            "@php artisan migrate --force",
+            "npm install --ignore-scripts",
+            "npm run build"
+        ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan dev"
+        ],
+        "test": [
+            "@php artisan config:clear --ansi @no_additional_args",
+            "@php artisan test"
+        ],
+        "post-autoload-dump": [
+            "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+            "@php artisan package:discover --ansi",
+            "@php artisan tws:filament-assets --upgrade"
+        ],
+        "post-update-cmd": [
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+            "@php artisan tws:filament-assets --upgrade"
+        ],
+        "post-install-cmd": [
+            "@php artisan livewire:publish --assets --ansi",
+            "@php artisan tws:filament-assets"
+        ],
+        "post-root-package-install": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ],
+        "post-create-project-cmd": [
+            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan tws:install --graceful --ansi"
+        ],
+        "pre-package-uninstall": [
+            "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "dont-discover": []
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true,
+            "php-http/discovery": true
+        },
+        "platform": {
+            "php": "8.4.24"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

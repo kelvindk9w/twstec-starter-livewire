@@ -1,0 +1,269 @@
+# =============================================================================
+# Docker Compose — PRODUÇÃO (autocontido)
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Sobe a stack completa funcional em qualquer host com Docker instalado,
+# sem nenhuma configuração de SO adicional:
+#   - nginx nas portas 80/443 (TLS com certificado autoassinado embutido na
+#     imagem — substituir por certificado real montando em /etc/nginx/certs);
+#   - app PHP-FPM com OPcache (imagem imutável: código+vendor+assets dentro);
+#   - postgres e redis SEM porta publicada no host (rede interna apenas);
+#   - migrate (one-shot), worker de fila e scheduler como containers dedicados;
+#   - volumes nomeados persistentes (reiniciar NUNCA reseta o banco).
+#
+# PACOTES DO KIT: no MONOREPO, a imagem do app os instala a partir de
+# ../../packages (contexto de build nomeado `packages`, nas linhas
+# `additional_contexts` dos serviços PHP — requer Docker Compose 2.17 ou mais
+# novo). Na versão PUBLICADA do starter (o projeto criado por
+# `composer create-project` / `laravel new --using=`) essas linhas não
+# existem: o .github/release/prepare-composer.php do monorepo as tira na
+# publicação, e os pacotes vêm do Composer (Packagist), como qualquer
+# dependência. O Dockerfile é o mesmo nos dois casos (ver o cabeçalho de
+# docker/php/Dockerfile).
+#
+# CONFIGURAÇÃO: as variáveis PROD_* abaixo podem ser definidas num arquivo
+# .env.prod (ver .env.prod.example) ou no ambiente do shell. Onde a variável
+# carrega SEGREDO não existe valor de fallback: `${VAR:?...}` faz o Compose se
+# recusar a resolver este arquivo enquanto ela não for definida.
+#
+# POR QUE NÃO HÁ MAIS SENHA PADRÃO: este arquivo oferecia `troque-esta-senha`
+# como fallback de POSTGRES_PASSWORD e REDIS_PASSWORD. Uma senha padrão que
+# FUNCIONA é a mesma armadilha da flag que já vem ligada — a stack sobe, nada
+# reclama, e a instalação fica em produção com a senha publicada no
+# repositório. Silêncio não pode significar permitido: agora falta de senha
+# para o `up`, em vez de inventar uma.
+#
+# A APP_KEY segue o mesmo princípio, num lugar diferente: ela chega pelo
+# env_file (.env.prod), então quem a exige é o entrypoint da imagem, que aborta
+# com código 78 quando ela falta em produção — ver docker/php/entrypoint-prod.sh
+# e Twstec\Kit\Foundation\Support\CriticalSecrets.
+#
+# ATENÇÃO: o Compose SEMPRE usa o .env da raiz para interpolar ${VAR} — por
+# isso aqui só existem nomes PROD_* (nunca presentes no .env de dev).
+# =============================================================================
+
+# Ambiente compartilhado dos containers PHP (app, queue, scheduler, migrate).
+x-app-env: &app-env
+  APP_ENV: production
+  APP_DEBUG: "false"
+  APP_URL: ${PROD_APP_URL:-https://localhost}
+  APP_LOCALE: ${PROD_APP_LOCALE:-pt_BR}
+  PLATFORM_NAME: ${PROD_PLATFORM_NAME:-TWS Starter Kit}
+  PLATFORM_LOGO_URL: ${PROD_PLATFORM_LOGO_URL:-}
+  PLATFORM_PRIMARY_COLOR: ${PROD_PLATFORM_PRIMARY_COLOR:-#0284C7}
+  # Quem pode dizer QUEM É O CLIENTE (ver Twstec\Kit\Foundation\Http\TrustedProxies).
+  #
+  # O PADRÃO É VAZIO — nenhum proxy confiável, `X-Forwarded-*` ignorado. Não há
+  # valor que o kit possa assumir pela topologia de quem instala, e o silêncio
+  # cai para o lado estreito: `ip()` fica sendo o endereço da conexão (o do
+  # nginx), errado mas não forjável.
+  #
+  # NA TOPOLOGIA DESTE ARQUIVO você QUER declarar: o nginx fala com o php-fpm
+  # pela rede interna, com endereço que o Docker atribui e que muda a cada
+  # recriação, e a porta 9000 não é publicada — então PROD_TRUSTED_PROXIES=private
+  # é a declaração certa. Sem ela, a allowlist do /admin compara o IP do nginx
+  # (trancando todo mundo fora), o rate limiting agrupa todos os visitantes num
+  # balde só e a trilha de auditoria grava sempre o mesmo `ip`. Com CDN/LB na
+  # frente, acrescente as faixas EXPLÍCITAS dela. Ver .env.prod.example.
+  #
+  # ESTREITE se a rede interna do host for COMPARTILHADA com terceiros (nó de
+  # cluster multi-inquilino, VPS com rede plana de provedor): ali o vizinho
+  # também tem endereço privado. `*` confia em qualquer origem e grava aviso no
+  # log a cada boot.
+  TRUSTED_PROXIES: ${PROD_TRUSTED_PROXIES:-}
+  # Hosts aceitos ALÉM do host da APP_URL (que já entra sozinho, com os
+  # subdomínios dele). Vazio NÃO significa "qualquer host": significa a APP_URL.
+  # Use para domínio com e sem www, ou domínio de staging na mesma instalação.
+  # Ver Twstec\Kit\Foundation\Http\TrustedHosts.
+  TRUSTED_HOSTS: ${PROD_TRUSTED_HOSTS:-}
+  # Origens permitidas no /admin e no /horizon.
+  #
+  # O fallback VAZIO aqui é deliberado e não é mais fail-open: quem recusa é a
+  # aplicação, no middleware da rota — com APP_ENV=production e sem allowlist
+  # declarada, o /admin e o /horizon respondem 403 e o log diz o que falta.
+  #
+  # POR QUE NÃO É `${VAR:?...}` COMO AS SENHAS: a senha padrão que FUNCIONA é
+  # invisível — a stack sobe, nada reclama, e nada dentro da aplicação consegue
+  # distinguir "senha do repositório" de "senha própria". Já a falta de
+  # allowlist a aplicação VÊ, e responde na medida: fica indisponível só a
+  # superfície administrativa. Exigir a variável aqui pararia a resolução do
+  # compose INTEIRO — nginx, postgres, site público, API — por um problema
+  # confinado a duas rotas, e ainda bloquearia quem legitimamente não tem
+  # allowlist (ver ADMIN_ALLOW_ANY_IP abaixo). Recusar é proporcional ao dano;
+  # derrubar o site não é.
+  ADMIN_ALLOWED_IPS: ${PROD_ADMIN_ALLOWED_IPS:-}
+  # Escape hatch da linha acima, para instalação cuja segunda barreira está
+  # FORA da aplicação (VPN, Cloudflare Access, WAF) ou cujo administrador tem
+  # IP dinâmico. Vazio = não declarado = a recusa vale. Aviso no log a cada
+  # boot enquanto estiver ligado.
+  ADMIN_ALLOW_ANY_IP: ${PROD_ADMIN_ALLOW_ANY_IP:-}
+  PLATFORM_OFFICIAL_URL: ${PROD_PLATFORM_OFFICIAL_URL:-https://localhost}
+  PLATFORM_SUPPORT_EMAIL: ${PROD_PLATFORM_SUPPORT_EMAIL:-}
+  PLATFORM_CNPJ: ${PROD_PLATFORM_CNPJ:-}
+  PLATFORM_LOCALE: ${PROD_PLATFORM_LOCALE:-pt_BR}
+  PLATFORM_CURRENCY: ${PROD_PLATFORM_CURRENCY:-BRL}
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_DATABASE: ${PROD_POSTGRES_DB:-tws_starter}
+  DB_USERNAME: ${PROD_POSTGRES_USER:-tws}
+  DB_PASSWORD: ${PROD_POSTGRES_PASSWORD:?defina PROD_POSTGRES_PASSWORD (sem valor padrao - ver .env.prod.example)}
+  CACHE_STORE: redis
+  SESSION_DRIVER: redis
+  QUEUE_CONNECTION: redis
+  REDIS_HOST: redis
+  REDIS_PASSWORD: ${PROD_REDIS_PASSWORD:?defina PROD_REDIS_PASSWORD (sem valor padrao - ver .env.prod.example)}
+  REDIS_PORT: 6379
+  # E-mail: SEM PROD_MAIL_MAILER o mailer fica `log`, e em produção a
+  # aplicação RECUSA enviar por ele — o `log` gravaria cada e-mail inteiro
+  # (código 2FA, link de redefinição de senha, dados pessoais) no arquivo de
+  # log. A stack sobe normalmente; o que falha, com a instrução do conserto, é
+  # cada job de e-mail no Horizon. Configure PROD_MAIL_* (e MAIL_USERNAME /
+  # MAIL_PASSWORD no .env.prod). Ver Twstec\Kit\Foundation\Mail\NonDeliveringMailers.
+  MAIL_MAILER: ${PROD_MAIL_MAILER:-log}
+  MAIL_HOST: ${PROD_MAIL_HOST:-}
+  MAIL_PORT: ${PROD_MAIL_PORT:-2525}
+  MAIL_FROM_ADDRESS: ${PROD_MAIL_FROM_ADDRESS:-no-reply@example.com}
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: prod
+    env_file:
+      - path: .env.prod
+        required: false
+    environment:
+      <<: *app-env
+      # APP_KEY: OBRIGATÓRIA, definida no .env.prod (ou no secret do
+      # orquestrador) e idêntica em app, migrate, horizon e scheduler. Sem ela
+      # o entrypoint ABORTA em produção, em vez de gerar uma chave por
+      # container — chave gerada na subida é diferente em cada container e não
+      # sobrevive ao restart, o que corrompe em silêncio tudo que depende dela.
+    volumes:
+      # Compartilha o public/ com o nginx (entrypoint copia na subida).
+      - app_public:/app-public
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - backend
+
+  nginx:
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+      target: prod
+    ports:
+      - "${PROD_WEB_HTTP_PORT:-80}:80"
+      - "${PROD_WEB_HTTPS_PORT:-443}:443"
+    volumes:
+      - app_public:/var/www/html/public:ro
+    # Para TLS real, descomentar e apontar para seus certificados:
+    #   - ./docker/nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - backend
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: prod
+    env_file:
+      - path: .env.prod
+        required: false
+    environment:
+      <<: *app-env
+    command: php artisan migrate --force --no-interaction
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - backend
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${PROD_POSTGRES_DB:-tws_starter}
+      POSTGRES_USER: ${PROD_POSTGRES_USER:-tws}
+      POSTGRES_PASSWORD: ${PROD_POSTGRES_PASSWORD:?defina PROD_POSTGRES_PASSWORD (sem valor padrao - ver .env.prod.example)}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # SEM `ports:` — banco inacessível fora da rede interna.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PROD_POSTGRES_USER:-tws} -d ${PROD_POSTGRES_DB:-tws_starter}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - backend
+
+  redis:
+    image: redis:8.10-alpine
+    command: redis-server --appendonly yes --requirepass ${PROD_REDIS_PASSWORD:?defina PROD_REDIS_PASSWORD (sem valor padrao - ver .env.prod.example)}
+    volumes:
+      - redis_data:/data
+    # SEM `ports:` — redis inacessível fora da rede interna (CVEs históricos).
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # Filas em produção = Horizon: supervisor que gerencia os
+  # workers com balanceamento, métricas e retry — dashboard em /horizon
+  # (restrito a is_admin + IP allowlist). Substitui o queue:work simples.
+  horizon:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: prod
+    env_file:
+      - path: .env.prod
+        required: false
+    environment:
+      <<: *app-env
+    command: php artisan horizon
+    depends_on:
+      - app
+      - redis
+    restart: unless-stopped
+    networks:
+      - backend
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+      target: prod
+    env_file:
+      - path: .env.prod
+        required: false
+    environment:
+      <<: *app-env
+    command: sh -c "while true; do php artisan schedule:run --no-interaction; sleep 60; done"
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_public:

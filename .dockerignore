@@ -1,0 +1,69 @@
+# =============================================================================
+# Contexto de build Docker — o que NUNCA entra na imagem.
+#
+# Só os builds de PRODUÇÃO leem o contexto (o target `dev` recebe o código por
+# volume bind), e a imagem de produção copia o que sobrar daqui para dentro de
+# /var/www/html. Então esta lista é, na prática, a lista do que NÃO pode estar
+# numa imagem que vai para um registry: segredos, dado local e ferramenta de
+# desenvolvimento.
+#
+# NENHUM arquivo de ambiente entra — nem o `.env.example`. Ele já foi reaberto
+# aqui (`!.env.example`) e ia dentro da imagem de produção com as flags de demo
+# ligadas e as senhas das contas demo. A aplicação não o lê em tempo de
+# execução (quem configura o container é o ambiente — ver docker-compose.prod.yml
+# e .env.prod.example), então não há motivo para a imagem carregá-lo.
+#
+# Para conferir o que foi parar dentro da imagem, ver README, seção Produção →
+# "O que vai dentro da imagem".
+# =============================================================================
+
+# Versionamento e CI
+.git
+.github
+.gitattributes
+.gitignore
+.editorconfig
+
+# Ambiente e segredos: TODO arquivo de ambiente, sem exceção
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+auth.json
+
+# Dependências — reinstaladas DENTRO do build, sem pacotes de dev
+vendor
+node_modules
+
+# Artefatos de build do frontend — refeitos no estágio `assets`
+public/build
+public/hot
+public/storage
+
+# Estado local da aplicação: uploads, backups (dumps do banco!), sessões,
+# cache, views compiladas, logs e o banco SQLite local da máquina de quem fez
+# o build. A estrutura de diretórios que a aplicação precisa é recriada no
+# Dockerfile.
+storage
+bootstrap/cache/*.php
+database/*.sqlite
+database/*.sqlite-*
+database/*.sqlite3
+
+# Testes, ferramentas e artefatos de desenvolvimento
+tests
+phpunit.xml
+phpunit.pgsql.xml
+playwright.config.js
+playwright-report
+test-results
+shots
+.playwright-mcp
+.impeccable
+docker/data
+docker/postgres
+docker-compose*.yml
+*.log

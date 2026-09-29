@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Marca do kit: monocromática de propósito (currentColor), para herdar a cor
+  do tema em vez de brigar com ele. Fallback do brandLogo do /admin quando
+  PLATFORM_LOGO_URL não está definido (ADR-007: o .env sempre vence).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" fill="none" role="img" aria-label="Logo">
+  <rect x="1" y="1" width="30" height="30" rx="8" stroke="currentColor" stroke-width="2"/>
+  <path d="M9 11h14M16 11v11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

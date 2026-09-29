@@ -1,0 +1,234 @@
+/*
+   Tema do super admin Filament (/admin).
+
+   Crítica de design #6: o painel do usuário e o /admin pareciam dois
+   produtos de duas empresas — tipografia, primária e superfícies
+   diferentes. Este arquivo é a ponte: o preset do Filament 5 + OS MESMOS
+   tokens de identidade do resto do kit (resources/css/theme.css), de modo
+   que rebranding continue sendo "1 arquivo + .env".
+
+   Registrado no vite.config.js e apontado por ->viteTheme() no
+   AdminPanelProvider (o painel é do aplicativo; as telas vêm do plugin do
+   pacote twstec/kit-admin).
+*/
+
+@import '../../vendor/filament/filament/resources/css/theme.css';
+
+/* As duas famílias da identidade, self-hosted (a CSP do kit não permite
+   font-src externo — nada de Google/Bunny Fonts no /admin). */
+@import '@fontsource-variable/space-grotesk';
+@import '@fontsource-variable/instrument-sans';
+
+/* Tokens da marca (cores, tipografia, radii, motion) — a MESMA fonte da
+   verdade do painel do usuário e da landing. */
+@import './theme.css';
+
+/* Classes usadas dentro do painel: o Tailwind 4 precisa enxergar os
+   arquivos para gerar os utilitários. As telas do produto são do pacote
+   twstec/kit-admin (o @import traz os @source dele e falha o build se o
+   pacote não estiver ao alcance); as do aplicativo ficam aqui. */
+@import '../../vendor/twstec/kit-admin/resources/css/sources.css';
+@source '../../app/Filament';
+@source '../../app/Providers/Filament';
+@source '../../resources/views/filament';
+
+@theme {
+    /* Corpo e títulos do /admin passam a falar a MESMA voz tipográfica do
+       resto do produto (o Filament usa Inter por padrão). */
+    --font-sans: 'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Space Grotesk Variable', 'Instrument Sans Variable', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+    /* Títulos de página, de seção e de widget na voz display — é o que
+       distingue visualmente o /admin de um Filament de fábrica. */
+    .fi-header-heading,
+    .fi-section-header-heading,
+    .fi-wi-stats-overview-stat-value,
+    .fi-modal-heading {
+        font-family: var(--font-display);
+        letter-spacing: -0.02em;
+    }
+}
+
+/* =============================================================================
+   Dashboards do /admin (config/dashboards.php).
+
+   Três coisas que separam um dashboard "premium" de um genérico e que o
+   Filament não entrega de fábrica:
+
+   1. TIPOGRAFIA NUMÉRICA tabular — sem ela, o número "dança" de largura
+      enquanto a animação de contagem roda e quando o período muda;
+   2. DENSIDADE controlada — respiro entre os cards e altura previsível de
+      linha, para a grade parecer uma grade e não uma colagem;
+   3. estado de FOCO e movimento sob controle do usuário.
+   ============================================================================= */
+
+@layer components {
+    /* Todo número de dashboard fala a voz display, em largura fixa. */
+    .fi-wi-stats-overview-stat-value,
+    .fi-dash-number {
+        font-family: var(--font-display);
+        font-variant-numeric: tabular-nums;
+        font-feature-settings: 'tnum' 1;
+        letter-spacing: -0.02em;
+    }
+
+    /* Δ% e legenda do card: um degrau abaixo, nunca competindo com o número. */
+    .fi-dash-stat .fi-wi-stats-overview-stat-description {
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Widget de progresso da meta (variante "Crescimento & API"). */
+    .fi-dash-goal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.875rem;
+    }
+
+    .fi-dash-goal-value {
+        display: flex;
+        align-items: baseline;
+        gap: 0.375rem;
+        font-size: 1.875rem;
+        font-weight: 600;
+        line-height: 1.1;
+        color: var(--color-gray-950, #09090b);
+    }
+
+    .fi-dash-goal-target {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--color-gray-500, #71717a);
+    }
+
+    .fi-dash-goal-track {
+        position: relative;
+        height: 0.5rem;
+        overflow: hidden;
+        border-radius: 9999px;
+        background-color: var(--color-gray-100, #f4f4f5);
+    }
+
+    .fi-dash-goal-bar {
+        height: 100%;
+        border-radius: 9999px;
+        transition: width 600ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* Marca do ritmo esperado: fina, neutra, sem roubar a leitura da barra. */
+    .fi-dash-goal-pace {
+        position: absolute;
+        inset-block: 0;
+        width: 2px;
+        background-color: var(--color-gray-400, #a1a1aa);
+        opacity: 0.9;
+    }
+
+    .fi-dash-goal-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+    }
+
+    .fi-dash-goal-meta {
+        font-size: 0.75rem;
+        color: var(--color-gray-500, #71717a);
+    }
+
+    .dark .fi-dash-goal-value {
+        color: var(--color-gray-50, #fafafa);
+    }
+
+    .dark .fi-dash-goal-track {
+        background-color: var(--color-gray-800, #27272a);
+    }
+}
+
+/* Quem pediu menos movimento não recebe transição nenhuma — a mesma regra
+   que o script de contagem aplica do lado do JS. */
+@media (prefers-reduced-motion: reduce) {
+    .fi-dash-goal-bar {
+        transition: none;
+    }
+}
+
+/* =============================================================================
+   Listagens do /admin: barra da tabela e rodapé dos cards.
+
+   Duas correções de layout que o Filament não expõe por API — por isso
+   vivem aqui, no tema, e não em PHP:
+
+   1. ALTERNADOR TABELA/CARDS na barra da tabela. O botão é declarado como
+      ação de barra (ViewModeToggle), e o Filament renderiza as ações de
+      barra no INÍCIO da linha. Só que ele é irmão do filtro e da busca —
+      os três dizem "como a lista aparece" — então ele tem de terminar
+      COLADO no ícone de filtros, do lado direito. Uma troca de `order`
+      resolve sem tocar na view do pacote.
+
+   2. AÇÕES DO CARD em partes iguais. No modo cards as ações caem numa
+      linha própria no rodapé do cartão; de fábrica elas ficam encostadas
+      num dos lados. Aqui a linha vira uma grade de N colunas de mesma
+      largura (`grid-auto-columns: 1fr`, sem precisar saber o N), cada
+      ícone centralizado na sua parte, separada do conteúdo por um filete
+      que atravessa o cartão inteiro.
+   ============================================================================= */
+
+@layer components {
+    /* (1) O grupo de ações da barra vai para o fim da linha, depois da
+       busca e do ícone de filtros. `margin-inline-start: auto` cobre a
+       listagem sem busca nem filtro, em que o grupo é o único filho. */
+    .fi-ta-header-toolbar > .fi-ta-actions {
+        order: 2;
+        margin-inline-start: auto;
+    }
+
+    .fi-ta-header-toolbar > :not(.fi-ta-actions) {
+        order: 1;
+    }
+
+    /* (2) Rodapé do card: uma coluna por ação, todas do mesmo tamanho.
+
+       O `!important` no padding não é preguiça: o próprio Filament aplica
+       `ps-4/pe-4` nesta linha por um seletor de 6 classes encadeadas, e o
+       filete precisa atravessar o cartão inteiro — um traço que morre a
+       16px de cada borda parece defeito de renderização. */
+    .fi-ta-content-grid .fi-ta-record-content-ctn > .fi-ta-actions {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: 1fr;
+        justify-items: stretch;
+        gap: 0;
+        width: 100%;
+        padding-inline: 0 !important;
+        padding-top: 0.625rem;
+        margin-bottom: -0.25rem;
+        border-top: 1px solid var(--color-gray-200, #e4e4e7);
+    }
+
+    .dark .fi-ta-content-grid .fi-ta-record-content-ctn > .fi-ta-actions {
+        border-top-color: var(--color-gray-800, #27272a);
+    }
+
+    /* Cada ação ocupa a sua fatia inteira e centraliza o ícone nela — a
+       área de clique é a coluna toda, não só os 20px do glifo. */
+    .fi-ta-content-grid .fi-ta-record-content-ctn > .fi-ta-actions > * {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        justify-self: stretch;
+        width: 100%;
+        min-width: 0;
+    }
+
+    /* Filete vertical entre as fatias: mostra a divisão sem desenhar
+       botões, que virariam quatro caixas dentro do cartão. */
+    .fi-ta-content-grid .fi-ta-record-content-ctn > .fi-ta-actions > * + * {
+        border-inline-start: 1px solid var(--color-gray-200, #e4e4e7);
+    }
+
+    .dark .fi-ta-content-grid .fi-ta-record-content-ctn > .fi-ta-actions > * + * {
+        border-inline-start-color: var(--color-gray-800, #27272a);
+    }
+}

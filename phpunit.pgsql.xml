@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Suíte contra PostgreSQL de verdade (o banco de produção). O CI roda com
+    este arquivo; o phpunit.xml (SQLite em memória) continua sendo o comando
+    padrão local, que não exige banco nenhum.
+
+    Diferenças para o phpunit.xml: só DB_CONNECTION e DB_DATABASE. Host,
+    porta, usuário e senha vêm do ambiente (no container `app` do dev, do
+    .env; no CI, das variáveis do job).
+
+    O nome do banco é FORÇADO para `tws_starter_test`: a suíte apaga o banco
+    a cada execução e nunca pode apontar para o banco de desenvolvimento do
+    .env. A tests/TestCase.php recusa qualquer banco cujo nome não termine
+    em _test. Para criar o banco de teste no Postgres do docker de dev, ver
+    docs/testes.md ("Testes contra o PostgreSQL").
+
+        docker compose exec app ./vendor/bin/pest -c phpunit.pgsql.xml
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+        <!-- Demonstração do kit (twstec/kit-demo, require-dev): sem ela
+             instalada, os testes do grupo `demo` pulam (tests/TestCase.php). -->
+        <testsuite name="Demo">
+            <directory>tests/Demo</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <!-- force + server: os containers Docker injetam APP_ENV=local via
+             env_file (.env), e o Laravel lê $_SERVER primeiro. Sem isto, o
+             ambiente de teste NÃO é testing (CSRF fica ativo etc.). -->
+        <env name="APP_ENV" value="testing"/>
+        <server name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <server name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <!-- Argon2id com parâmetros mínimos nos testes (velocidade) — o
+             ALGORITMO é o mesmo da produção, só o custo é menor. -->
+        <env name="ARGON_MEMORY" value="1024" force="true"/>
+        <server name="ARGON_MEMORY" value="1024" force="true"/>
+        <env name="ARGON_THREADS" value="1" force="true"/>
+        <server name="ARGON_THREADS" value="1" force="true"/>
+        <env name="ARGON_TIME" value="1" force="true"/>
+        <server name="ARGON_TIME" value="1" force="true"/>
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <server name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <env name="CACHE_STORE" value="array"/>
+        <!-- Único ponto que difere do phpunit.xml. -->
+        <env name="DB_CONNECTION" value="pgsql" force="true"/>
+        <env name="DB_DATABASE" value="tws_starter_test" force="true"/>
+        <env name="DB_URL" value="" force="true"/>
+        <!-- $_SERVER precisa bater com o env acima: os containers Docker injetam
+             DB_* do .env via env_file, e o Laravel lê $_SERVER primeiro. -->
+        <server name="DB_CONNECTION" value="pgsql" force="true"/>
+        <server name="DB_DATABASE" value="tws_starter_test" force="true"/>
+        <server name="DB_URL" value="" force="true"/>
+        <!-- Idem cache: o rate limiter usa a store default; Redis persistiria
+             os contadores ENTRE testes, tornando-os dependentes de ordem. -->
+        <server name="CACHE_STORE" value="array" force="true"/>
+        <!-- Modo demo DESLIGADO na suíte, independente do .env: com ele ligado
+             (o .env.example liga), a migration instala o gatilho das contas demo
+             no banco de teste do PostgreSQL e ele fica valendo para a suíte
+             inteira. Os testes que precisam do modo demo ligam por config() e
+             instalam o gatilho eles mesmos (DemoAccountHardeningTest). -->
+        <env name="DEMO_LOGIN_ENABLED" value="false" force="true"/>
+        <server name="DEMO_LOGIN_ENABLED" value="false" force="true"/>
+        <!-- Fila, e-mail e sessão FORÇADOS (e o custo do hash, acima): o
+             container de dev injeta QUEUE_CONNECTION=redis, MAIL_MAILER=smtp,
+             SESSION_DRIVER=redis e o Argon2id de produção no ambiente, e um
+             <env> sem force não os sobrescreve. Sem isto, a suíte local
+             mandava jobs para a fila do Redis de DEV (o worker de dev os
+             processava contra o banco de dev), e-mails para o Mailpit e
+             rodava o hash com 64 MB — diferente do CI, que não injeta nada. -->
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <server name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <server name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <server name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>
