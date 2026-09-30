@@ -1,0 +1,65 @@
+# Nginx — DESENVOLVIMENTO de um projeto criado (compose.yaml da raiz do
+# projeto). A imagem oficial do nginx troca ${DEV_APP_HOST} e ${DEV_SITE_PORT}
+# pelos valores do ambiente ao subir (NGINX_ENVSUBST_FILTER=^DEV_: nenhuma
+# outra variável é tocada — as do próprio nginx, como $host, ficam).
+#
+# ENDEREÇO: http://<nome do projeto>.localhost:<porta>, não localhost. Cookie
+# é por HOST, não por porta: dois projetos em `localhost` (portas diferentes)
+# dividiriam a sessão e o XSRF-TOKEN, e o primeiro envio depois de trocar de
+# aba cairia no "sessão expirou". Quem abrir localhost:<porta> (ou
+# 127.0.0.1) é levado ao mesmo caminho no endereço do projeto (308: o método e
+# o corpo são mantidos). Só no desenvolvimento: a produção usa
+# docker/nginx/prod.conf.
+
+map $http_host $dev_canonical_host {
+    default "";
+    "~^(localhost|127\.0\.0\.1)(:[0-9]+)?$" "${DEV_APP_HOST}:${DEV_SITE_PORT}";
+}
+
+server {
+    listen 80;
+    server_name _;
+
+    if ($dev_canonical_host) {
+        return 308 http://$dev_canonical_host$request_uri;
+    }
+
+    # Sem versão no header `Server` nem nas páginas de erro do nginx.
+    server_tokens off;
+
+    root /var/www/html/public;
+    index index.php;
+
+    client_max_body_size 25M;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # Só o front controller executa PHP (como na produção): um `.php`
+    # esquecido no public/ não chega ao php-fpm.
+    location ~ ^/index\.php(/|$) {
+        fastcgi_pass app:9000;
+        fastcgi_split_path_info ^(.+\.php)(/.*)$;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_hide_header X-Powered-By;
+
+        # Quem é o cliente (ver docker/nginx/dev.conf e
+        # Twstec\Kit\Foundation\Http\TrustedProxies): o endereço real da
+        # conexão é ANEXADO ao que o cliente mandou.
+        fastcgi_param HTTP_X_FORWARDED_FOR $proxy_add_x_forwarded_for;
+        fastcgi_param HTTP_X_FORWARDED_PROTO $scheme;
+        fastcgi_param HTTP_X_FORWARDED_HOST $host;
+        include fastcgi_params;
+    }
+
+    location ~ \.php$ {
+        return 404;
+    }
+
+    # Nunca servir arquivos ocultos (.env, .git...).
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}

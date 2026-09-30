@@ -3,8 +3,10 @@
 # Dockerfile PHP-FPM — TWS Laravel Starter Kit
 #
 # Targets:
-#   dev   → desenvolvimento (código montado via volume bind)
-#   prod  → produção (código, vendor e assets DENTRO da imagem — imutável)
+#   dev        → desenvolvimento do monorepo (código montado via volume bind)
+#   workspace  → desenvolvimento de um projeto criado: o `dev` com o Composer e
+#                o git (compose.yaml de desenvolvimento e Dev Container)
+#   prod       → produção (código, vendor e assets DENTRO da imagem — imutável)
 #
 # O MESMO arquivo serve nos dois cenários do target prod:
 #
@@ -129,6 +131,21 @@ CMD ["php-fpm"]
 # Do composer, só o binário vem da imagem oficial, com versão pinada.
 # -----------------------------------------------------------------------------
 FROM composer:2.10.3 AS composer-bin
+
+# -----------------------------------------------------------------------------
+# DESENVOLVIMENTO DE UM PROJETO CRIADO (o compose.yaml de desenvolvimento do
+# projeto, e o Dev Container do VS Code): o `dev` acima com o que se usa ao
+# programar DENTRO do container — o Composer (o mesmo binário pinado da
+# produção) e o git. É um estágio à parte para o `dev` do monorepo continuar
+# exatamente como é; nada daqui chega à imagem de produção (o `prod` parte do
+# `base`).
+# -----------------------------------------------------------------------------
+FROM dev AS workspace
+
+USER root
+COPY --from=composer-bin /usr/bin/composer /usr/bin/composer
+RUN apk add --no-cache git
+USER dev
 
 # -----------------------------------------------------------------------------
 # Pacotes do kit de FORA do contexto principal — OPCIONAL. Vazio por padrão (o

@@ -190,10 +190,13 @@ it('X-Forwarded-Host NÃO é obedecido por padrão, nem vindo de proxy confiáve
     config()->set('security.proxies.trusted', ['10.0.0.0/8']);
     rotaDeInspecao();
 
+    // O host continua o da aplicação (o da APP_URL: `localhost` no
+    // monorepo, `<nome>.localhost` num projeto criado com o Docker de
+    // desenvolvimento) — nunca o que o cabeçalho mandou.
     $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.9'])
         ->get('/api/_test/origem', ['X-Forwarded-Host' => 'evil.example.com'])
         ->assertOk()
-        ->assertJsonPath('host', 'localhost');
+        ->assertJsonPath('host', parse_url((string) config('app.url'), PHP_URL_HOST));
 });
 
 it('X-Forwarded-Host só passa a valer com a segunda decisão declarada', function (): void {

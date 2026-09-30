@@ -1,0 +1,29 @@
+// Dev Container do VS Code — programar DENTRO do container do projeto.
+//
+// NO PROJETO CRIADO, ESTE ARQUIVO É O .devcontainer/devcontainer.json (a
+// publicação do starter o põe lá; no monorepo ele fica em docker/dev/). Usa o
+// MESMO compose.yaml do `docker compose up -d`: o nome do projeto e as portas
+// vêm do .env, e o VS Code entra no container `app` (PHP 8.4, Composer e git),
+// com o projeto em /var/www/html. Abra a pasta do projeto no VS Code e use
+// "Reopen in Container" (extensão Dev Containers).
+{
+    "name": "TWS Laravel Starter Kit (Livewire)",
+    "dockerComposeFile": ["../compose.yaml"],
+    "service": "app",
+    "workspaceFolder": "/var/www/html",
+    "remoteUser": "dev",
+    "overrideCommand": false,
+    // Fechar o VS Code não derruba o projeto (ele continua no ar, como pelo
+    // `docker compose up -d`).
+    "shutdownAction": "none",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "laravel.vscode-laravel",
+                "bmewburn.vscode-intelephense-client",
+                "bradlc.vscode-tailwindcss",
+                "EditorConfig.EditorConfig"
+            ]
+        }
+    }
+}

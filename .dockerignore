@@ -66,4 +66,9 @@ shots
 docker/data
 docker/postgres
 docker-compose*.yml
+# O Docker de DESENVOLVIMENTO do projeto (compose.yaml, Dev Container e o que
+# eles usam em docker/dev/) nunca vai para a imagem de produção.
+compose*.yaml
+docker/dev
+.devcontainer
 *.log

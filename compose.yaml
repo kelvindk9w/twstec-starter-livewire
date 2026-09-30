@@ -1,0 +1,206 @@
+# =============================================================================
+# Docker Compose — DESENVOLVIMENTO do projeto (TWS Laravel Starter Kit)
+#
+# NO PROJETO CRIADO, ESTE ARQUIVO É O compose.yaml DA RAIZ: a publicação do
+# starter o põe lá (.github/release/prepare-composer.php, no monorepo). No
+# monorepo ele fica em docker/dev/ de propósito — um compose.yaml na raiz de
+# starters/<starter> mudaria o `docker compose` de quem roda o monorepo dali.
+# Os caminhos abaixo são relativos à RAIZ do projeto.
+#
+#   docker compose up -d        sobe tudo (a primeira vez constrói as imagens)
+#   docker compose stop         para (os dados ficam)
+#   docker compose exec app php artisan test
+#
+# O QUE SOBE: app (PHP-FPM 8.4), nginx (o site), init (de uma vez: instala o
+# vendor/ se faltar e roda as migrations), queue (fila), scheduler, vite
+# (recarga ao vivo do front), postgres, redis e mailpit (os e-mails enviados).
+#
+# TUDO VEM DO .env DO PROJETO (o instalador grava na criação — ver o README,
+# "Docker de desenvolvimento"):
+#   COMPOSE_PROJECT_NAME   o nome do projeto: prefixo dos containers, dos
+#                          volumes e da rede; o endereço é
+#                          http://<nome>.localhost:<porta do site>
+#   DEV_SITE_PORT          site (808N)          DEV_MAIL_PORT  e-mails (802N)
+#   DEV_VITE_PORT          Vite (803N)          DEV_DB_PORT    banco (804N)
+#   COMPOSE_PROFILES       `db-port` publica o banco na DEV_DB_PORT; vazio, o
+#                          banco só existe dentro do Docker
+#   DEV_UID / DEV_GID      o dono dos arquivos na máquina: os containers gravam
+#                          como ele (nada fica com dono root)
+#   DB_* / REDIS_PASSWORD  senhas do projeto, geradas pelo instalador
+# Trocar uma porta ou o nome: edite o .env e rode `docker compose up -d` (o
+# nome novo cria containers e volumes novos, com o banco vazio).
+#
+# SEGURANÇA: tudo é publicado só em 127.0.0.1 (DEV_BIND) — nada fica aberto
+# para a rede. O Redis nunca é publicado; o banco, só com o perfil db-port. O
+# Mailpit é só local. Imagem de PRODUÇÃO: docker-compose.prod.yml (outra
+# imagem, outro arquivo — nada daqui vai para ela).
+# =============================================================================
+
+x-php: &php
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+    target: workspace
+    args:
+      UID: ${DEV_UID:-1000}
+      GID: ${DEV_GID:-1000}
+  volumes:
+    - .:/var/www/html
+  init: true
+
+services:
+  # De uma vez, antes do app: o vendor/ (se faltar — um clone novo do
+  # projeto) e as migrations. O app só sobe depois que ele termina bem.
+  init:
+    <<: *php
+    command:
+      - sh
+      - -ec
+      - |
+        [ -f vendor/autoload.php ] || composer install --no-interaction --no-progress
+        php artisan migrate --force --no-interaction
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
+
+  app:
+    <<: *php
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  queue:
+    <<: *php
+    command: php artisan queue:work --sleep=3 --tries=3 --backoff=5
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  scheduler:
+    <<: *php
+    # O scheduler nativo do Laravel, de minuto em minuto.
+    command: sh -c "while true; do php artisan schedule:run --no-interaction; sleep 60; done"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  nginx:
+    image: nginx:stable-alpine3.24
+    ports:
+      - "${DEV_BIND:-127.0.0.1}:${DEV_SITE_PORT:-8080}:80"
+    environment:
+      NGINX_ENVSUBST_FILTER: ^DEV_
+      DEV_APP_HOST: ${COMPOSE_PROJECT_NAME}.localhost
+      DEV_SITE_PORT: ${DEV_SITE_PORT:-8080}
+    volumes:
+      - .:/var/www/html:ro
+      - ./docker/dev/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+    depends_on:
+      - app
+
+  # Recarga ao vivo: o Vite serve o CSS e o JS enquanto roda (public/hot) e
+  # recarrega a página quando um arquivo muda. Node 24 em Debian (os binários
+  # nativos do front são os de glibc). A primeira subida instala o
+  # node_modules/ se faltar. DEV_VITE_POLLING=true: para pastas do Windows
+  # montadas no Docker, onde a mudança de arquivo não chega sozinha.
+  vite:
+    image: node:24-slim
+    user: "${DEV_UID:-1000}:${DEV_GID:-1000}"
+    working_dir: /var/www/html
+    init: true
+    environment:
+      HOME: /tmp
+      VITE_DEV_ORIGIN: http://${COMPOSE_PROJECT_NAME}.localhost:${DEV_VITE_PORT:-8030}
+      VITE_DEV_POLLING: ${DEV_VITE_POLLING:-false}
+    command:
+      - sh
+      - -ec
+      - |
+        [ -d node_modules ] || npm ci --no-audit --no-fund
+        exec node_modules/.bin/vite
+    ports:
+      - "${DEV_BIND:-127.0.0.1}:${DEV_VITE_PORT:-8030}:5173"
+    volumes:
+      - .:/var/www/html
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:?defina DB_DATABASE no .env (o instalador grava)}
+      POSTGRES_USER: ${DB_USERNAME:?defina DB_USERNAME no .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env (o instalador gera)}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  # O banco da suíte contra o PostgreSQL (phpunit.pgsql.xml), se faltar.
+  db-init:
+    image: postgres:18-alpine
+    environment:
+      PGHOST: postgres
+      PGUSER: ${DB_USERNAME}
+      PGPASSWORD: ${DB_PASSWORD}
+      PGDATABASE: ${DB_DATABASE}
+    command:
+      - sh
+      - -c
+      - |
+        psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'tws_starter_test'" | grep -q 1 \
+          || psql -c "CREATE DATABASE tws_starter_test"
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # O banco na máquina (127.0.0.1:DEV_DB_PORT), só com COMPOSE_PROFILES=db-port
+  # no .env: um repasse TCP (o nginx da imagem acima), sem mexer no postgres.
+  db-port:
+    image: nginx:stable-alpine3.24
+    profiles: [db-port]
+    command:
+      - sh
+      - -ec
+      - |
+        printf 'events {}\nstream { server { listen 5432; proxy_pass postgres:5432; } }\n' > /tmp/db-port.conf
+        exec nginx -c /tmp/db-port.conf -g 'daemon off;'
+    ports:
+      - "${DEV_BIND:-127.0.0.1}:${DEV_DB_PORT:-8040}:5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redis:
+    image: redis:8.10-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?defina REDIS_PASSWORD no .env (o instalador gera)}
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    # Com senha e AOF (a fila não se perde num reinício). Nunca publicado.
+    command: sh -c 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  # Os e-mails que o projeto envia (MAIL_HOST=mailpit no .env): a caixa de
+  # entrada em http://<nome>.localhost:DEV_MAIL_PORT. Só local.
+  mailpit:
+    image: axllent/mailpit:v1.30.7
+    ports:
+      - "${DEV_BIND:-127.0.0.1}:${DEV_MAIL_PORT:-8020}:8025"
+
+volumes:
+  postgres_data:
+  redis_data:
