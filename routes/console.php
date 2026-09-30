@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use Composer\InstalledVersions;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -48,9 +50,11 @@ if (Kit::has('accounts')) {
 // criptografado → disco de destino (R2 em produção). O sucesso dispara o
 // webhook da validação cruzada produção→sandbox (BACKUP_WEBHOOK_URL —
 // endpoint receptor no sandbox; contrato em docs/backup.md). Frequências em cron
-// (UTC) via .env; backup:clean aplica a retenção e backup:monitor é o
-// health check de idade/tamanho. onOneServer/withoutOverlapping evitam
-// execução dupla em deploys com múltiplos schedulers.
+// (UTC) em config/backup.php → schedule (BACKUP_*_CRON no .env), lidas com
+// config() — env() aqui seria ignorado com config:cache. backup:clean
+// aplica a retenção e backup:monitor é o health check de idade/tamanho.
+// onOneServer/withoutOverlapping evitam execução dupla em deploys com
+// múltiplos schedulers.
 // =============================================================================
 // Poda da tabela `failed_jobs`: job falho guarda o payload e o texto da
 // exceção, e sem poda isso fica para sempre. Janela em
@@ -73,16 +77,16 @@ Schedule::command('audit:prune')
 // desliga, com aviso no log) — não precisa de linha aqui. Ver docs/uploads.md.
 
 Schedule::command('backup:run --only-db')
-    ->cron((string) env('BACKUP_RUN_CRON', '0 * * * *'))
+    ->cron((string) config('backup.schedule.run', '0 * * * *'))
     ->withoutOverlapping()
     ->onOneServer();
 
 Schedule::command('backup:clean')
-    ->cron((string) env('BACKUP_CLEAN_CRON', '30 2 * * *'))
+    ->cron((string) config('backup.schedule.clean', '30 2 * * *'))
     ->withoutOverlapping()
     ->onOneServer();
 
 Schedule::command('backup:monitor')
-    ->cron((string) env('BACKUP_MONITOR_CRON', '0 3 * * *'))
+    ->cron((string) config('backup.schedule.monitor', '0 3 * * *'))
     ->withoutOverlapping()
     ->onOneServer();

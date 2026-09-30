@@ -16,7 +16,7 @@ return [
     'name' => env('PLATFORM_NAME', 'TWS Starter Kit'),
 
     // Versão da plataforma (endpoint /api/health, rodapés, suporte).
-    'version' => env('PLATFORM_VERSION', '2.0.0-beta.5'),
+    'version' => env('PLATFORM_VERSION', '2.0.0-beta.6'),
 
     // URL do logotipo oficial (nunca caminho hardcoded em views).
     'logo_url' => env('PLATFORM_LOGO_URL'),
@@ -59,5 +59,20 @@ return [
 
     // Moeda padrão da plataforma (multi-moeda preparado: valor + moeda).
     'currency' => env('PLATFORM_CURRENCY', 'BRL'),
+
+    // Dinheiro (Twstec\Kit\Foundation\Money\Money — docs/convencoes.md).
+    'money' => [
+        // Regra de arredondamento que Money::defaultRounding() devolve: nome
+        // de um caso do enum nativo RoundingMode (HalfAwayFromZero = metade
+        // para longe do zero; HalfEven = metade para o par, "do banqueiro";
+        // TowardsZero, AwayFromZero, NegativeInfinity, PositiveInfinity...).
+        // O cálculo continua pedindo a regra no parâmetro: esta é só a que o
+        // projeto escolhe passar quando quer uma regra única.
+        'rounding' => env('PLATFORM_MONEY_ROUNDING', 'HalfAwayFromZero'),
+
+        // Casas decimais por moeda, quando não são as do ISO 4217 (moeda
+        // própria, crédito interno em milésimos...). Ex.: ['XPT' => 3].
+        'fraction_digits' => [],
+    ],
 
 ];

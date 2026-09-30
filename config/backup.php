@@ -30,6 +30,19 @@ use Spatie\DbDumper\Compressors\GzipCompressor;
 
 return [
 
+    /*
+     * Frequências dos comandos agendados em routes/console.php (cron, UTC).
+     * Lidas daqui com config() — NUNCA env() fora de config/: com
+     * `config:cache` (produção) o .env não é lido, e um env() na rota
+     * cairia no padrão em silêncio. Chave do kit; o spatie/laravel-backup
+     * ignora.
+     */
+    'schedule' => [
+        'run' => env('BACKUP_RUN_CRON', '0 * * * *'),
+        'clean' => env('BACKUP_CLEAN_CRON', '30 2 * * *'),
+        'monitor' => env('BACKUP_MONITOR_CRON', '0 3 * * *'),
+    ],
+
     'backup' => [
         /*
          * The name of this application. You can use this name to monitor
