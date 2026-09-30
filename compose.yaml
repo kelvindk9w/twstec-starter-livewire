@@ -201,6 +201,22 @@ services:
     ports:
       - "${DEV_BIND:-127.0.0.1}:${DEV_MAIL_PORT:-8020}:8025"
 
+  # `docker compose run --rm instalar` numa pasta que JÁ É um projeto (o
+  # comando do guia, repetido): em vez de "no such service", o recado. Só
+  # existe para o `run` (perfil próprio: o `up -d` não o sobe).
+  instalar:
+    image: nginx:stable-alpine3.24
+    profiles: [instalar]
+    network_mode: none
+    command:
+      - sh
+      - -c
+      - |
+        echo "Esta pasta já é o projeto ${COMPOSE_PROJECT_NAME} (o instalador já rodou aqui)."
+        echo "Para subir: docker compose up -d  —  depois abra http://${COMPOSE_PROJECT_NAME}.localhost:${DEV_SITE_PORT:-8080}"
+        echo "Para criar OUTRO projeto: baixe o twstec-kit numa pasta nova e rode o instalador lá."
+        exit 1
+
 volumes:
   postgres_data:
   redis_data:
