@@ -12,15 +12,11 @@
 #   - migrate (one-shot), worker de fila e scheduler como containers dedicados;
 #   - volumes nomeados persistentes (reiniciar NUNCA reseta o banco).
 #
-# PACOTES DO KIT: no MONOREPO, a imagem do app os instala a partir de
-# ../../packages (contexto de build nomeado `packages`, nas linhas
-# `additional_contexts` dos serviços PHP — requer Docker Compose 2.17 ou mais
-# novo). Na versão PUBLICADA do starter (o projeto criado por
-# `composer create-project` / `laravel new --using=`) essas linhas não
-# existem: o .github/release/prepare-composer.php do monorepo as tira na
-# publicação, e os pacotes vêm do Composer (Packagist), como qualquer
-# dependência. O Dockerfile é o mesmo nos dois casos (ver o cabeçalho de
-# docker/php/Dockerfile).
+# PACOTES DO KIT: vêm do Composer (Packagist), como qualquer dependência; o
+# build é o do docker/php/Dockerfile (ver o cabeçalho dele).
+#
+# BANCO: o nome padrão (PROD_POSTGRES_DB) é o do projeto — o instalador o
+# grava na criação; troque-o no .env.prod, se quiser outro.
 #
 # CONFIGURAÇÃO: as variáveis PROD_* abaixo podem ser definidas num arquivo
 # .env.prod (ver .env.prod.example) ou no ambiente do shell. Onde a variável

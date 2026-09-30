@@ -1,0 +1,114 @@
+# =============================================================================
+# CI do projeto — o mesmo conjunto do `scripts/verificar` (que roda local, no
+# Docker): Pint (estilo), auditorias de dependências (Composer e npm), o build
+# do front e a suíte Pest contra o PostgreSQL 18 (o banco de produção).
+#
+# QUANDO RODA: à mão (aba Actions → CI → "Run workflow") e uma vez por semana
+# (segunda, 06:00 UTC — pega dependência com falha de segurança nova mesmo sem
+# commit). Não roda a cada push de propósito: repositório privado tem cota de
+# minutos do Actions. Para rodar a cada push e pull request, acrescente em
+# `on:` (e, se quiser, exija o check na proteção da branch):
+#
+#   push:
+#     branches: [main]
+#   pull_request:
+#
+# SEGURANÇA: permissão só de leitura; as ações de terceiros fixadas pelo
+# commit (a versão fica no comentário ao lado — atualize os dois juntos); o
+# checkout não guarda a credencial do GitHub no disco.
+#
+# O banco da suíte é o que o phpunit.pgsql.xml força (<banco>_test): o passo
+# "Banco de teste" o lê de lá e o cria no PostgreSQL do job.
+# =============================================================================
+name: CI
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Pint · auditorias · build · Pest (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: ci
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Variáveis do processo vencem o .env; o nome do banco vem forçado pelo
+    # phpunit.pgsql.xml.
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_USERNAME: ci
+      DB_PASSWORD: ci
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: PHP 8.4
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pgsql, intl, gd, bcmath, zip, pcntl, posix, mbstring, redis
+          coverage: none
+
+      - name: Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Dependências PHP
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Estilo (Pint)
+        run: ./vendor/bin/pint --test
+
+      - name: Auditoria de dependências PHP
+        run: composer audit --no-interaction
+
+      - name: Dependências Node
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Auditoria de dependências Node
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build do front
+        run: npm run build
+
+      - name: Ambiente de teste
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Banco de teste
+        run: |
+          database=$(sed -n 's/.*<env name="DB_DATABASE" value="\([^"]*\)".*/\1/p' phpunit.pgsql.xml | head -n 1)
+          test -n "$database"
+          PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -U "$DB_USERNAME" -d ci -c "CREATE DATABASE \"$database\""
+
+      - name: Testes (Pest · PostgreSQL 18)
+        run: ./vendor/bin/pest --ci -c phpunit.pgsql.xml

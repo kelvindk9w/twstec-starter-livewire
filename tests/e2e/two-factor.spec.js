@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { mailpitBaseUrl as mailpit } from './support/project-env.js';
 import { deleteAccountViaAdmin, deleteMailpitMessagesTo } from './support/cleanup.js';
 
 // =============================================================================
@@ -6,18 +7,16 @@ import { deleteAccountViaAdmin, deleteMailpitMessagesTo } from './support/cleanu
 // conta nova → senha de transação → LIGA o segundo fator no perfil (senha de
 // transação + código por e-mail) → sai → entra com a senha → tela do código
 // (sessão ainda NÃO autenticada) → código REAL entregue pelo worker ao Mailpit
-// → painel. No fim, o próprio teste apaga o que criou: a conta (pelo /admin,
-// com o super admin demo) e as mensagens do Mailpit.
+// → painel. No fim, o próprio teste apaga o que criou: a conta (pelo /admin —
+// support/admin.js) e as mensagens do Mailpit.
 //
 // Por que uma conta NOVA e não o e2e@example.com: ligar o segundo fator na
 // conta compartilhada quebraria o login do global-setup e dos outros specs.
 //
 // Pré-requisitos: stack de dev no ar com o worker `queue` e o Mailpit
-// (E2E_MAILPIT_URL, padrão http://localhost:18025), modo demo ligado (o
-// super admin demo faz a limpeza).
+// (E2E_MAILPIT_URL, ou a DEV_MAIL_PORT do .env — support/project-env.js).
 // =============================================================================
 
-const mailpit = process.env.E2E_MAILPIT_URL ?? 'http://localhost:18025';
 const loginPassword = 'SenhaForte123';
 const transactionPassword = 'Transacao2fa9';
 
@@ -148,8 +147,8 @@ test.describe('verificação em duas etapas no login', () => {
                 await expect(page.getByRole('heading', { level: 1 })).toContainText('Olá,');
             });
         } finally {
-            // Limpeza: a conta sai do banco pelo /admin (super admin demo, que
-            // não tem segundo fator) e as mensagens saem do Mailpit.
+            // Limpeza: a conta sai do banco pelo /admin (support/admin.js) e as
+            // mensagens saem do Mailpit.
             await deleteAccountViaAdmin(browser, address);
             await deleteMailpitMessagesTo(request, address);
         }

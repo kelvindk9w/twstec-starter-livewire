@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { mailpitBaseUrl as mailpit } from './support/project-env.js';
 import { deleteAccountViaAdmin, deleteMailpitMessagesTo } from './support/cleanup.js';
 
 // =============================================================================
@@ -8,16 +9,14 @@ import { deleteAccountViaAdmin, deleteMailpitMessagesTo } from './support/cleanu
 //
 // Pré-requisitos: stack de dev no ar com o worker `queue` rodando e o Mailpit
 // (docker compose sobe os dois). A caixa do Mailpit é lida pela API dele
-// (E2E_MAILPIT_URL, padrão http://localhost:18025).
+// (E2E_MAILPIT_URL, ou a DEV_MAIL_PORT do .env — support/project-env.js).
 //
 // Cada rodada cadastra uma conta NOVA (e-mail com carimbo de tempo), porque o
 // cadastro não aceita e-mail repetido. No fim — passando ou falhando — o
-// próprio teste apaga o que criou: a conta (pelo /admin, com o super admin
-// demo, por isso o modo demo precisa estar ligado) e as mensagens do Mailpit.
+// próprio teste apaga o que criou: a conta (pelo /admin — support/admin.js)
+// e as mensagens do Mailpit.
 // Ver tests/e2e/support/cleanup.js.
 // =============================================================================
-
-const mailpit = process.env.E2E_MAILPIT_URL ?? 'http://localhost:18025';
 
 /**
  * Espera o e-mail chegar ao Mailpit (a fila entrega em segundos) e devolve o

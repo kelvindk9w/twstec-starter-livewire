@@ -55,6 +55,7 @@ database/*.sqlite3
 
 # Testes, ferramentas e artefatos de desenvolvimento
 tests
+scripts
 phpunit.xml
 phpunit.pgsql.xml
 playwright.config.js

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoInstalled } from './support/project-env.js';
 
 // =============================================================================
 // E2E do painel do usuário: login → dashboard, telas
@@ -8,21 +9,8 @@ import { test, expect } from '@playwright/test';
 // grava tests/e2e/.auth/e2e.json — os testes autenticados reusam a sessão
 // (o login tem rate limit agressivo, throttle:sensitive).
 //
-// Pré-requisitos:
-//   1. Stack de dev no ar (`docker compose up -d`), nginx na 8180 do host.
-//   2. Usuário E2E criado no banco de dev:
-//        docker compose exec app php artisan tinker --execute='
-//          \App\Models\User::factory()->create([
-//            "email" => "e2e@example.com",
-//            "password" => "E2eSenhaForte123",
-//          ]);'
-//      (credenciais sobreponíveis via E2E_USER_EMAIL / E2E_USER_PASSWORD;
-//      a factory cria a conta com o e-mail já confirmado — sem isso o
-//      painel mandaria à tela de verificação)
-//
-// Rodar em container (sem Node local):
-//   docker run --rm --network host -v $(pwd):/work -w /work \
-//     mcr.microsoft.com/playwright:v1.63.0-noble npx playwright test
+// Pré-requisitos e como rodar: ver o playwright.config.js (o projeto no ar e
+// as pessoas fixas de tests/e2e/fixtures.php).
 // =============================================================================
 
 const email = process.env.E2E_USER_EMAIL ?? 'e2e@example.com';
@@ -150,8 +138,11 @@ test.describe('regressões', () => {
         await page.getByRole('button', { name: 'Abrir menu de navegação' }).click();
         await expect(drawer).toBeVisible();
 
-        // Links do site...
-        await expect(drawer.getByRole('link', { name: 'Componentes' })).toBeVisible();
+        // Links do site (os institucionais vêm das extensões — a vitrine
+        // "Componentes" é da demonstração do kit, quando instalada)...
+        if (demoInstalled) {
+            await expect(drawer.getByRole('link', { name: 'Componentes' })).toBeVisible();
+        }
         // ...e a seção da conta, com identidade e os itens do menu lateral.
         await expect(drawer.getByText('Minha conta')).toBeVisible();
         await expect(drawer.getByRole('link', { name: 'Chaves de API' })).toBeVisible();
@@ -216,7 +207,14 @@ test.describe('regressões', () => {
             buffer: Buffer.from(PNG_BASE64, 'base64'),
         });
         await cartao.getByRole('button', { name: /salvar foto/i }).click();
-        await expect(page.getByText(/foto/i).first()).toBeVisible();
+        // Espera a foto salva virar imagem na página (o texto "foto" já estava
+        // lá — no botão —, e recarregar antes de o envio terminar perdia a
+        // foto: o teste falhava por pressa, não pelo produto).
+        await expect
+            .poll(() => page.evaluate(() => Array.from(document.images).some((i) => /\/storage\/avatars\//.test(i.src))), {
+                timeout: 15_000,
+            })
+            .toBe(true);
 
         // A foto tem de sobreviver ao reload: o vínculo é do banco, não da
         // sessão. E a URL é ASSINADA (política de uploads do kit: documento

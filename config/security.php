@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Support\ViteDevServerCsp;
+
 // =============================================================================
 // Segurança HTTP e pipeline de logs de requisição.
 //
@@ -23,11 +25,23 @@ return [
 
         // CSP básica. Endurecer em produção (remover 'unsafe-inline' com nonces)
         // quando o frontend estiver pronto para isso.
-        'content_security_policy' => env(
-            'SECURITY_CSP',
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-            ."img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; "
-            ."frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        //
+        // A única exceção é o SERVIDOR DE DESENVOLVIMENTO do Vite (o serviço
+        // `vite` do Docker de desenvolvimento, ou `npm run dev`): em
+        // APP_ENV=local, com o arquivo public/hot presente, a origem dele entra
+        // em script-src/style-src/font-src/img-src e no connect-src (com o
+        // WebSocket do HMR) — e mais nada, nunca 'unsafe-eval'. Sem isso, a
+        // CSP recusava os scripts e o CSS do Vite e o front não carregava. Ver
+        // App\Support\ViteDevServerCsp e docs/seguranca.md.
+        'content_security_policy' => ViteDevServerCsp::extend(
+            env(
+                'SECURITY_CSP',
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+                ."img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; "
+                ."frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+            ),
+            (string) env('APP_ENV', 'production'),
+            __DIR__.'/../public/hot',
         ),
 
         // CSP do super admin (/admin — Filament): o Filament 5 usa expressões

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { demoInstalled } from './support/project-env.js';
 
 // =============================================================================
 // E2E do super admin (/admin — Filament), um teste por assunto:
@@ -7,25 +8,34 @@ import { test, expect } from '@playwright/test';
 // (alternador tabela/cards), tela de Auditoria (ação recusada e executada) e
 // seletor de idioma.
 //
-// Login: a sessão do SUPER ADMIN DEMO é criada UMA vez no global-setup (botão
-// "Entrar" com as credenciais pré-preenchidas — o setup falha se isso
-// quebrar) e reaproveitada aqui por storageState. O login do Filament tem
-// limite agressivo; um login por teste estouraria o limite.
+// Os de DADOS DA DEMONSTRAÇÃO do kit (vitrine de segurança, produtos e a conta
+// demo protegida na Auditoria) só existem com ela instalada (`demoTest`): sem
+// ela — o projeto criado —, nem são registrados (não aparecem como pulados).
+// Ficam neste arquivo, e não num à parte, pela ordem: ver abaixo.
+//
+// Login: a sessão do /admin é criada UMA vez no global-setup (support/admin.js
+// — o super admin demo, com a demonstração; o admin do E2E, sem ela) e
+// reaproveitada aqui por storageState. O login do Filament tem limite
+// agressivo; um login por teste estouraria o limite.
 //
 // Os testes deste arquivo rodam em sequência no mesmo worker (o projeto não
 // liga fullyParallel), mas não dependem uns dos outros: cada um abre as suas
-// telas. Em sequência importa porque o de idioma troca o idioma da conta demo
-// por um instante — em paralelo, os rótulos em português dos outros sumiriam.
+// telas. Em sequência importa porque o de idioma troca o idioma da conta do
+// /admin por um instante — em paralelo, os rótulos em português dos outros
+// sumiriam.
 //
 // Esperas: por elementos concretos da tela e pela inicialização do Livewire
 // (antes dela, um clique em botão do Filament não chega ao servidor), nunca
 // por "rede ociosa" — que a cada poll/prefetch do painel pode demorar.
 //
-// Pré-requisito: stack de dev no ar com seeders demo (DatabaseSeeder roda
+// Os dados demo vêm dos seeders da demonstração (DatabaseSeeder roda
 // DemoUser/DemoAdmin/Product/FormSubmission quando ui.demo_login.enabled).
 // =============================================================================
 
 test.use({ storageState: 'tests/e2e/.auth/admin.json' });
+
+// Teste que usa os dados da demonstração: só registrado com ela instalada.
+const demoTest = demoInstalled ? test : () => {};
 
 /**
  * Abre uma tela do /admin e espera o Livewire ter inicializado os componentes.
@@ -75,7 +85,7 @@ test('trilha de requisições: navegação WEB e tentativa de ataque observada',
     await expect(page.getByText(/<script>alert\('e2e'\)/)).toHaveCount(0);
 });
 
-test('vitrine de segurança: submissões com ataques bloqueados, evidência no detalhe e filtro na URL', async ({ page }) => {
+demoTest('vitrine de segurança: submissões com ataques bloqueados, evidência no detalhe e filtro na URL', async ({ page }) => {
     await openAdmin(page, '/admin/form-submissions');
 
     // A LISTAGEM mostra o selo do tipo de ataque e o trecho neutralizado —
@@ -99,7 +109,7 @@ test('vitrine de segurança: submissões com ataques bloqueados, evidência no d
     await expect(page.getByRole('cell', { name: 'Livewire (AJAX)' })).toHaveCount(0);
 });
 
-test('produtos: paginação de 10 refletida na URL (?page=2)', async ({ page }) => {
+demoTest('produtos: paginação de 10 refletida na URL (?page=2)', async ({ page }) => {
     await openAdmin(page, '/admin/products?page=2');
 
     await expect(page).toHaveURL(/page=2/);
@@ -143,7 +153,7 @@ test('usuários: alternador na barra da tabela e ações do card em partes iguai
     await expect(page.getByRole('row').nth(1)).toBeVisible({ timeout: 15000 });
 });
 
-test('tela de Auditoria: ação recusada e ação executada aparecem, com o link para a requisição', async ({ page }) => {
+demoTest('tela de Auditoria: ação recusada e ação executada aparecem, com o link para a requisição', async ({ page }) => {
     // 1) Ação RECUSADA, sem efeito colateral nenhum: bloquear a conta demo do
     // cliente. A guarda do servidor recusa — e a tentativa vai para a trilha
     // como `user.blocked` / Recusada.
@@ -210,9 +220,9 @@ test('seletor de idioma (bandeira em SVG + nome) troca o idioma do painel', asyn
         // Painel em inglês: o grupo de navegação traduz.
         await expect(page.getByText('Security and audit').first()).toBeVisible({ timeout: 15000 });
     } finally {
-        // Cleanup: a troca persiste users.locale na conta demo (banco de dev
-        // compartilhado) — volta para PT mesmo se o teste falhar no meio.
-        // Enquanto dura, a conta demo vê o /admin em inglês em QUALQUER
+        // Cleanup: a troca persiste users.locale na conta do /admin (banco de
+        // dev compartilhado) — volta para PT mesmo se o teste falhar no meio.
+        // Enquanto dura, essa conta vê o /admin em inglês em QUALQUER
         // sessão, inclusive nos outros workers: quem usa o /admin fora deste
         // arquivo não pode depender de texto (ver support/cleanup.js).
         await openAdmin(page, '/admin');

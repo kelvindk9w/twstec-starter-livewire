@@ -8,11 +8,12 @@
     porta, usuário e senha vêm do ambiente (no container `app` do dev, do
     .env; no CI, das variáveis do job).
 
-    O nome do banco é FORÇADO para `tws_starter_test`: a suíte apaga o banco
-    a cada execução e nunca pode apontar para o banco de desenvolvimento do
-    .env. A tests/TestCase.php recusa qualquer banco cujo nome não termine
-    em _test. Para criar o banco de teste no Postgres do docker de dev, ver
-    docs/testes.md ("Testes contra o PostgreSQL").
+    O nome do banco é FORÇADO (DB_DATABASE abaixo, <banco do projeto>_test —
+    o instalador grava o do projeto): a suíte apaga o banco a cada execução e
+    nunca pode apontar para o banco de desenvolvimento do .env. A
+    tests/TestCase.php recusa qualquer banco cujo nome não termine em _test.
+    No Docker de desenvolvimento, o serviço db-init do compose.yaml cria esse
+    banco (<DB_DATABASE>_test, o mesmo nome) na subida.
 
         docker compose exec app ./vendor/bin/pest -c phpunit.pgsql.xml
 -->
@@ -34,6 +35,13 @@
             <directory>tests/Demo</directory>
         </testsuite>
     </testsuites>
+    <!-- A demonstração do kit (twstec/kit-demo) não é publicada: os testes
+         dela (grupo `demo`) não rodam neste projeto — nem como "pulados". -->
+    <groups>
+        <exclude>
+            <group>demo</group>
+        </exclude>
+    </groups>
     <source>
         <include>
             <directory>app</directory>

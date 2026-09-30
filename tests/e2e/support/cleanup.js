@@ -1,4 +1,6 @@
 import { expect } from '@playwright/test';
+import { signInToAdmin } from './admin.js';
+import { mailpitBaseUrl as mailpit } from './project-env.js';
 
 // =============================================================================
 // Limpeza dos specs que CRIAM dados no ambiente de dev (contas novas e
@@ -6,13 +8,10 @@ import { expect } from '@playwright/test';
 // num `finally`, para não deixar resto no banco nem na caixa — inclusive
 // quando o teste falha no meio.
 //
-// A conta sai pelo /admin, com o super admin demo (botão "Entrar" da tela de
-// login do painel, sem senha digitada): é o caminho que um operador usaria, e
-// passa pelas guardas do UserAdminGuard. Por isso os specs que usam esta
-// limpeza precisam do modo demo ligado.
+// A conta sai pelo /admin (support/admin.js: o super admin demo, com a
+// demonstração instalada; o admin do E2E, sem ela): é o caminho que um
+// operador usaria, e passa pelas guardas do UserAdminGuard.
 // =============================================================================
-
-const mailpit = process.env.E2E_MAILPIT_URL ?? 'http://localhost:18025';
 
 /**
  * Exclui a conta `address` pelo /admin. Não faz nada se a conta não existe
@@ -34,14 +33,7 @@ export async function deleteAccountViaAdmin(browser, address) {
     const leftover = `limpeza E2E: a conta ${address} pode ter ficado no banco de dev`;
 
     try {
-        await admin.goto('/admin/login', { waitUntil: 'networkidle' });
-        // O formulário do Filament é Livewire: clicar antes de ele inicializar
-        // não chega ao servidor (mesma espera do global-setup).
-        await admin.waitForFunction(() => document.querySelector('[wire\\:id]')?.__livewire !== undefined, null, {
-            timeout: 15_000,
-        });
-        await admin.getByRole('button', { name: /entrar|sign in|iniciar|^login$/i }).click();
-        await admin.waitForURL((url) => !url.pathname.includes('login'), { timeout: 15_000 });
+        await signInToAdmin(admin);
 
         await admin.goto(search, { waitUntil: 'networkidle' });
         const row = admin.getByRole('row').filter({ hasText: address });
@@ -93,12 +85,7 @@ export async function deleteAccountsViaAdmin(browser, addresses) {
     let pending = [...addresses];
 
     try {
-        await admin.goto('/admin/login', { waitUntil: 'networkidle' });
-        await admin.waitForFunction(() => document.querySelector('[wire\\:id]')?.__livewire !== undefined, null, {
-            timeout: 15_000,
-        });
-        await admin.getByRole('button', { name: /entrar|sign in|iniciar|^login$/i }).click();
-        await admin.waitForURL((url) => !url.pathname.includes('login'), { timeout: 15_000 });
+        await signInToAdmin(admin);
 
         for (let round = 0; round <= addresses.length && pending.length > 0; round++) {
             const left = [];

@@ -45,7 +45,7 @@ server {
         fastcgi_param PATH_INFO $fastcgi_path_info;
         fastcgi_hide_header X-Powered-By;
 
-        # Quem é o cliente (ver docker/nginx/dev.conf e
+        # Quem é o cliente (ver docker/nginx/prod.conf e
         # Twstec\Kit\Foundation\Http\TrustedProxies): o endereço real da
         # conexão é ANEXADO ao que o cliente mandou.
         fastcgi_param HTTP_X_FORWARDED_FOR $proxy_add_x_forwarded_for;

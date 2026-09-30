@@ -1,11 +1,7 @@
 # =============================================================================
 # Docker Compose — DESENVOLVIMENTO do projeto (TWS Laravel Starter Kit)
 #
-# NO PROJETO CRIADO, ESTE ARQUIVO É O compose.yaml DA RAIZ: a publicação do
-# starter o põe lá (.github/release/prepare-composer.php, no monorepo). No
-# monorepo ele fica em docker/dev/ de propósito — um compose.yaml na raiz de
-# starters/<starter> mudaria o `docker compose` de quem roda o monorepo dali.
-# Os caminhos abaixo são relativos à RAIZ do projeto.
+# Os caminhos abaixo são relativos à RAIZ do projeto (onde fica este arquivo).
 #
 #   docker compose up -d        sobe tudo (a primeira vez constrói as imagens)
 #   docker compose stop         para (os dados ficam)
@@ -34,6 +30,13 @@
 # para a rede. O Redis nunca é publicado; o banco, só com o perfil db-port. O
 # Mailpit é só local. Imagem de PRODUÇÃO: docker-compose.prod.yml (outra
 # imagem, outro arquivo — nada daqui vai para ela).
+#
+# IPv4 SÓ: as portas saem em 127.0.0.1, não em [::1]. Em alguns sistemas (e
+# dentro de containers, como o do Playwright) `<nome>.localhost` resolve
+# primeiro para ::1: o navegador tenta o 127.0.0.1 sozinho, mas um script
+# (Node, curl) que chame pelo nome recebe "connection refused" — nele, use
+# http://127.0.0.1:<porta> (o E2E já faz isso com o Mailpit). Publicar também
+# em [::1] quebraria o `up` onde o IPv6 está desligado.
 # =============================================================================
 
 x-php: &php
@@ -116,6 +119,9 @@ services:
     environment:
       HOME: /tmp
       VITE_DEV_ORIGIN: http://${COMPOSE_PROJECT_NAME}.localhost:${DEV_VITE_PORT:-8030}
+      # A origem da página (o site): a única que o Vite libera no CORS
+      # (vite.config). Sem ela, o navegador bloqueia os scripts do Vite.
+      VITE_DEV_APP_URL: http://${COMPOSE_PROJECT_NAME}.localhost:${DEV_SITE_PORT:-8080}
       VITE_DEV_POLLING: ${DEV_VITE_POLLING:-false}
     command:
       - sh
@@ -143,7 +149,9 @@ services:
       timeout: 5s
       retries: 20
 
-  # O banco da suíte contra o PostgreSQL (phpunit.pgsql.xml), se faltar.
+  # O banco da suíte contra o PostgreSQL, se faltar: <DB_DATABASE>_test — o
+  # MESMO nome que o phpunit.pgsql.xml força (o instalador grava os dois a
+  # partir do nome do projeto).
   db-init:
     image: postgres:18-alpine
     environment:
@@ -155,8 +163,8 @@ services:
       - sh
       - -c
       - |
-        psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'tws_starter_test'" | grep -q 1 \
-          || psql -c "CREATE DATABASE tws_starter_test"
+        psql -tAc "SELECT 1 FROM pg_database WHERE datname = '${DB_DATABASE}_test'" | grep -q 1 \
+          || psql -c "CREATE DATABASE \"${DB_DATABASE}_test\""
     restart: "no"
     depends_on:
       postgres:

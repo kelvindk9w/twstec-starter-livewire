@@ -1,0 +1,52 @@
+#!/bin/sh
+# =============================================================================
+# scripts/verificar — o MESMO conjunto do CI (.github/workflows/ci.yml), na
+# máquina, pelo Docker de desenvolvimento do projeto (sem PHP nem Node
+# instalados):
+#
+#   1. estilo (Pint)
+#   2. auditoria de dependências PHP (composer audit)
+#   3. auditoria de dependências Node (npm audit, só as de produção, alta+)
+#   4. build do front
+#   5. a suíte Pest contra o PostgreSQL (o banco <banco>_test do
+#      phpunit.pgsql.xml, que o serviço db-init cria)
+#
+# Uso, na raiz do projeto:   scripts/verificar
+# (No Windows, no terminal do WSL ou no Git Bash; ou rode os mesmos comandos
+# um a um, no PowerShell.)
+#
+# Para no primeiro passo que falhar, com o código de saída dele. Sobe só o
+# banco (e o db-init) se ainda não estiverem no ar; os containers dos passos
+# são descartáveis (`run --rm`). As auditorias consultam a internet.
+# =============================================================================
+set -eu
+
+cd "$(dirname "$0")/.."
+
+if [ ! -f compose.yaml ] || [ ! -f .env ]; then
+    echo "scripts/verificar: rode num projeto com o Docker de desenvolvimento (compose.yaml e .env na raiz — o instalador os cria)." >&2
+    exit 2
+fi
+
+passo() {
+    printf '\n==> %s\n' "$1"
+}
+
+passo 'Estilo (Pint)'
+docker compose run --rm --no-deps -T app ./vendor/bin/pint --test
+
+passo 'Auditoria de dependências PHP'
+docker compose run --rm --no-deps -T app composer audit --no-interaction
+
+passo 'Auditoria de dependências Node'
+docker compose run --rm --no-deps -T vite sh -ec '[ -d node_modules ] || npm ci --no-audit --no-fund; npm audit --omit=dev --audit-level=high'
+
+passo 'Build do front'
+docker compose run --rm --no-deps -T vite npm run build
+
+passo 'Testes (Pest · PostgreSQL)'
+docker compose up -d --wait postgres
+docker compose run --rm -T db-init
+docker compose run --rm --no-deps -T app ./vendor/bin/pest --ci -c phpunit.pgsql.xml
+
+printf '\nscripts/verificar: tudo certo.\n'

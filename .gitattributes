@@ -5,3 +5,16 @@
 *.html diff=html
 *.md diff=markdown
 *.php diff=php
+
+# Só do repositório do kit: o E2E e as capturas da DEMONSTRAÇÃO (landings,
+# vitrine /ui). A demonstração não é publicada, então
+# nada disso vai para o projeto criado (o `composer archive` e o ZIP do GitHub
+# respeitam o export-ignore).
+/tests/e2e/smoke.spec.js export-ignore
+/tests/e2e/landing.spec.js export-ignore
+/tests/e2e/landing-v2.spec.js export-ignore
+/tests/e2e/form-patterns.spec.js export-ignore
+/tests/e2e/screenshots.js export-ignore
+/tests/e2e/shots-admin.js export-ignore
+/tests/e2e/shots-panel.js export-ignore
+/tests/e2e/interactions.js export-ignore

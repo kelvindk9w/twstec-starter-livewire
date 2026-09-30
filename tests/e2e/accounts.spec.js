@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { mailpitBaseUrl as mailpit } from './support/project-env.js';
 import { deleteAccountsViaAdmin, deleteMailpitMessagesTo } from './support/cleanup.js';
 
 // =============================================================================
@@ -18,7 +19,6 @@ import { deleteAccountsViaAdmin, deleteMailpitMessagesTo } from './support/clean
 // Ver tests/e2e/support/cleanup.js.
 // =============================================================================
 
-const mailpit = process.env.E2E_MAILPIT_URL ?? 'http://localhost:18025';
 const loginPassword = 'SenhaForte123';
 const transactionPassword = 'Transacao9Contas';
 

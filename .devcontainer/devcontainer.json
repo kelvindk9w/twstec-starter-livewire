@@ -1,7 +1,6 @@
 // Dev Container do VS Code — programar DENTRO do container do projeto.
 //
-// NO PROJETO CRIADO, ESTE ARQUIVO É O .devcontainer/devcontainer.json (a
-// publicação do starter o põe lá; no monorepo ele fica em docker/dev/). Usa o
+// Fica em .devcontainer/devcontainer.json, onde o VS Code o procura. Usa o
 // MESMO compose.yaml do `docker compose up -d`: o nome do projeto e as portas
 // vêm do .env, e o VS Code entra no container `app` (PHP 8.4, Composer e git),
 // com o projeto em /var/www/html. Abra a pasta do projeto no VS Code e use

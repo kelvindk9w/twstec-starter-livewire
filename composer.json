@@ -82,6 +82,7 @@
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+            "@php artisan livewire:publish --assets --ansi",
             "@php artisan tws:filament-assets --upgrade"
         ],
         "post-install-cmd": [
