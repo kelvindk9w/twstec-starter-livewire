@@ -10,7 +10,7 @@ use App\Models\User;
 
 beforeEach(function () {
     $this->admin = User::factory()->create();
-    $this->admin->forceFill(['is_admin' => true])->save();
+    $this->admin->forceFill(['is_admin' => true, 'admin_role' => 'owner'])->save();
 });
 
 it('renderiza o admin em pt-BR por padrão (fallback da plataforma)', function () {

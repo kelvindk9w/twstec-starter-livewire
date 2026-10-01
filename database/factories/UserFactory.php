@@ -46,6 +46,34 @@ class UserFactory extends Factory
     }
 
     /**
+     * Admin criado pela factory (`create(['is_admin' => true])`) sem papel
+     * declarado nasce DONO do /admin — como o `user:make-admin` faz. Para
+     * outro papel, passe `admin_role` (ou use admin('support')). Só com o
+     * twstec/kit-admin instalado (é ele que cria a coluna).
+     */
+    public function configure(): static
+    {
+        return $this->afterMaking(function (User $user): void {
+            if (config()->has('admin.authorization.super_role')
+                && $user->getAttribute('is_admin') === true
+                && $user->getAttribute('admin_role') === null) {
+                $user->forceFill(['admin_role' => (string) config('admin.authorization.super_role')]);
+            }
+        });
+    }
+
+    /**
+     * Admin do /admin com o papel dado (padrão: o de dono).
+     */
+    public function admin(?string $role = null): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'is_admin' => true,
+            'admin_role' => $role ?? (string) config('admin.authorization.super_role', 'owner'),
+        ]);
+    }
+
+    /**
      * Usuário com senha de transação definida (hash separado da senha de login).
      */
     public function withTransactionPassword(string $password = 'Trans4cao!Segura'): static

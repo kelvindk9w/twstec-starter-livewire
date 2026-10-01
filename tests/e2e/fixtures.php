@@ -17,8 +17,11 @@ declare(strict_types=1);
 //   E-mail confirmado, ativa, sem segundo fator, idioma pt_BR, tema do
 //   sistema, sem foto e sem senha de transação.
 // - admin-e2e@example.com: super admin do /admin (login do global-setup e a
-//   limpeza das pessoas que os testes criam). NÃO começa com `e2e-`: esse é o
-//   prefixo das pessoas que os testes criam e apagam.
+//   limpeza das pessoas que os testes criam), com senha de transação — com a
+//   demonstração, é quem APROVA o pedido do E2E da aprovação em dois passos
+//   (tests/e2e/approvals.spec.js, que cria e apaga os próprios dados). NÃO
+//   começa com `e2e-`: esse é o prefixo das pessoas que os testes criam e
+//   apagam.
 //
 // As senhas podem vir do ambiente (E2E_USER_PASSWORD, E2E_ADMIN_PASSWORD),
 // as mesmas que o Playwright lê.
@@ -59,7 +62,7 @@ $fixture = function (string $email, string $name, string $password, bool $transa
 };
 
 $fixture('e2e@example.com', 'Pessoa E2E', (string) (getenv('E2E_USER_PASSWORD') ?: 'E2eSenhaForte123'), false);
-$fixture('admin-e2e@example.com', 'Admin E2E', (string) (getenv('E2E_ADMIN_PASSWORD') ?: 'E2eAdminSenha123'), false);
+$fixture('admin-e2e@example.com', 'Admin E2E', (string) (getenv('E2E_ADMIN_PASSWORD') ?: 'E2eAdminSenha123'), true);
 
 // O /admin é opcional (twstec/kit-admin): sem ele, o admin do E2E é só uma
 // pessoa comum, sem uso.

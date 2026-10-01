@@ -1,5 +1,5 @@
 import { chromium } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { signInToAdmin } from './support/admin.js';
 import { installed, isolationProblem, mailpitBaseUrl, userEmail, userPassword } from './support/project-env.js';
 
@@ -33,6 +33,11 @@ export default async function globalSetup(config) {
     }
 
     mkdirSync('tests/e2e/.auth', { recursive: true });
+
+    // Quando a suíte começou a falar com o site: o teto por IP da borda
+    // (RATE_LIMIT_WEB por minuto) é dividido por todos os specs, e quem
+    // precisa de uma janela própria espera a seguinte (approvals.spec.js).
+    writeFileSync('tests/e2e/.auth/suite-started-at', String(Date.now()));
 
     const browser = await chromium.launch();
 
