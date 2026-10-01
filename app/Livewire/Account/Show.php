@@ -232,7 +232,9 @@ final class Show extends Component
 
     public function requestDelete(DeleteAccount $delete): void
     {
-        $delete->authorize($this->user());
+        // Impedimento de exclusão declarado (twstec/kit-accounts) chega como
+        // erro no campo `account`: mostrado junto do botão, antes do código.
+        $this->run(fn () => $delete->authorize($this->user()), [], 'deleteAccount');
         $this->requireTransactionPassword('deleteAccount');
 
         $this->openSensitiveModal('delete');

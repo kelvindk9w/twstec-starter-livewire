@@ -52,6 +52,15 @@ const ISOLATION_SYSTEM_MODE_REVIEWED = [
     'vendor/twstec/kit-uploads/src/Erasure/UploadEraser.php' => 1,
     // Limpeza agendada: varre os uploads sem dono de todas as contas.
     'vendor/twstec/kit-uploads/src/Console/PruneOrphanUploads.php' => 1,
+    // Entrega do confidencial (rota sem sessão): acha o upload em qualquer
+    // conta; quem decide é a regra da URL assinada (a conta tem de ser a do
+    // upload e quem gerou, ainda membro dela).
+    'vendor/twstec/kit-uploads/src/Confidential/ConfidentialAccess.php' => 1,
+    // Rotação da chave dos confidenciais: recifra os de todas as contas.
+    'vendor/twstec/kit-uploads/src/Console/ReencryptConfidentialUploads.php' => 1,
+    // Guarda legal como impedimento de exclusão: conta os uploads sob guarda
+    // das contas que sairiam.
+    'vendor/twstec/kit-uploads/src/Retention/LegalHoldDeletionCheck.php' => 1,
     // O /admin inteiro (todas as requisições do painel, depois do acesso de
     // admin) — modo sistema da requisição (systemModeForRequest).
     'vendor/twstec/kit-admin/src/Http/Middleware/OperateAdminPanelAsSystem.php' => 1,
