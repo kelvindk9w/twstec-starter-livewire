@@ -32,6 +32,23 @@ return [
         'disabled' => 'Two-step verification is off. Sign-in asks for your password only again.',
     ],
 
+    // Setting up REQUIRED two-step verification (AUTH_TWO_FACTOR_REQUIRED).
+    'two_factor_setup' => [
+        'title' => 'Set up two-step verification',
+        'intro' => 'This installation requires two-step verification. Once set up, every sign-in asks for your password and a code sent to :email.',
+        'grace' => 'You can postpone until :date. After that, the panel only opens with two-step verification set up.',
+        'date_format' => 'm/d/Y',
+        'transaction_password_heading' => 'First, set your transaction password',
+        'transaction_password_hint' => 'Turning verification on is a sensitive action: it is confirmed with your transaction password (different from your sign-in password) and a code by email.',
+        'confirm_heading' => 'Confirm with your transaction password',
+        'confirm_hint' => 'We will send a 6-digit code to your email.',
+        'send_code' => 'Send code',
+        'code_intro' => 'We sent a 6-digit code to :email. Enter it below — it is valid for :minutes minutes.',
+        'submit' => 'Turn on and continue',
+        'resend_hint' => 'Didn\'t get it? Check your spam folder or request another code with your transaction password.',
+        'later' => 'Set up later',
+    ],
+
     // UI strings (authentication forms/screens).
     'ui' => [
         'login_title' => 'Sign in',

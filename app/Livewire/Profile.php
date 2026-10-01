@@ -14,6 +14,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
+use Twstec\Kit\Auth\Exceptions\TwoFactorRequiredException;
 use Twstec\Kit\Auth\PasswordPolicy;
 use Twstec\Kit\Auth\Services\TransactionPasswordService;
 use Twstec\Kit\Auth\Services\TwoFactorLogin;
@@ -215,7 +216,20 @@ final class Profile extends Component
             throw ValidationException::withMessages(['twoFactor' => $reason]);
         }
 
-        $this->openSensitiveModal($twoFactor->enabledFor($this->user()) ? 'two_factor_disable' : 'two_factor_enable');
+        $disabling = $twoFactor->enabledFor($this->user());
+
+        // Desligar com o segundo fator obrigatório (AUTH_TWO_FACTOR_REQUIRED):
+        // recusado no servidor — e registrado na trilha pelo pacote — antes
+        // de qualquer código sair.
+        if ($disabling) {
+            try {
+                $twoFactor->ensureCanDisable($this->user());
+            } catch (TwoFactorRequiredException $exception) {
+                throw ValidationException::withMessages(['twoFactor' => collect($exception->errors())->flatten()->all()]);
+            }
+        }
+
+        $this->openSensitiveModal($disabling ? 'two_factor_disable' : 'two_factor_enable');
     }
 
     protected function performSensitiveAction(string $action, string $token): void
@@ -240,12 +254,15 @@ final class Profile extends Component
     {
         $user = $this->user()->fresh();
         $twoFactor = app(TwoFactorLogin::class);
+        $twoFactorEnabled = $twoFactor->enabledFor($user);
 
         return view('livewire.profile', [
             'user' => $user,
             'twoFactorAvailable' => TwoFactorLogin::available(),
-            'twoFactorEnabled' => $twoFactor->enabledFor($user),
-            'twoFactorBlockedReason' => $twoFactor->blockedReason($user),
+            'twoFactorEnabled' => $twoFactorEnabled,
+            // Ligada, o motivo é o de desligar (inclui a obrigatoriedade).
+            'twoFactorBlockedReason' => $twoFactorEnabled ? $twoFactor->disableBlockedReason($user) : $twoFactor->blockedReason($user),
+            'twoFactorRequired' => $twoFactor->requiredFor($user),
             'sensitiveDescription' => match ($this->pendingAction) {
                 'two_factor_enable' => __('panel.profile.two_factor_confirm_enable'),
                 'two_factor_disable' => __('panel.profile.two_factor_confirm_disable'),

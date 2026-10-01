@@ -124,6 +124,9 @@ return [
         'two_factor_recovery' => 'El código siempre llega al correo de la cuenta: sin acceso a él, no hay forma de completar el inicio de sesión. Mantén ese correo seguro.',
         'two_factor_confirm_enable' => 'Para activar la verificación en dos pasos, confirma con tu contraseña de transacción y el código enviado por correo.',
         'two_factor_confirm_disable' => 'Para desactivar la verificación en dos pasos, confirma con tu contraseña de transacción y el código enviado por correo.',
+        'two_factor_required' => 'Obligatoria en esta instalación',
+        'two_factor_grace' => 'La verificación en dos pasos es obligatoria en esta instalación. Configúrala antes del :date — después, el panel solo se abre con ella.',
+        'two_factor_grace_action' => 'Configurar ahora',
     ],
 
     // Confirmación de acción sensible (modal compartido del panel: contraseña

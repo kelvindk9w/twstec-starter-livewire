@@ -10,12 +10,16 @@ use Symfony\Component\HttpFoundation\Response;
 use Twstec\Kit\Auth\Actions\CompleteTwoFactorLogin;
 use Twstec\Kit\Auth\Contracts\AuthUser;
 use Twstec\Kit\Auth\Contracts\Responses\EmailVerificationResponse;
+use Twstec\Kit\Auth\Contracts\Responses\TwoFactorSetupResponse;
 use Twstec\Kit\Auth\Enums\EmailVerificationOutcome;
 use Twstec\Kit\Auth\Http\Controllers\TwoFactorChallengeController;
+use Twstec\Kit\Auth\Http\Controllers\TwoFactorSetupController;
 use Twstec\Kit\Auth\Services\TwoFactorLogin;
 use Twstec\Kit\Auth\Support\EmailVerification;
 use Twstec\Kit\Auth\Support\EmailVerificationResult;
+use Twstec\Kit\Auth\Support\Registration;
 use Twstec\Kit\Auth\Support\TwoFactorChallengeResult;
+use Twstec\Kit\Auth\Support\TwoFactorRequirement;
 
 /**
  * As TELAS de autenticação do starter Livewire (views Blade em
@@ -34,8 +38,14 @@ final class AuthPageController
         return view('auth.login');
     }
 
+    /**
+     * Tela de cadastro — 404 com o cadastro público fechado
+     * (AUTH_REGISTRATION_ENABLED=false).
+     */
     public function register(): View
     {
+        Registration::ensureOpen();
+
         return view('auth.register');
     }
 
@@ -90,5 +100,30 @@ final class AuthPageController
     public function transactionPassword(): View
     {
         return view('auth.transaction-password');
+    }
+
+    /**
+     * Configuração do segundo fator OBRIGATÓRIO (AUTH_TWO_FACTOR_REQUIRED).
+     * Sem nada a configurar (regra não vale para a conta, ou ela já ligou),
+     * segue para o destino como o próprio fluxo seguiria. A tela mostra o
+     * passo em que a pessoa está: definir a senha de transação, mandar o
+     * código, digitar o código.
+     */
+    public function twoFactorSetup(Request $request, TwoFactorRequirement $requirement, TwoFactorLogin $twoFactor): View|Response
+    {
+        /** @var AuthUser $user */
+        $user = $request->user();
+
+        if (! $requirement->pendingFor($user)) {
+            return app(TwoFactorSetupResponse::class)->toResponse($request);
+        }
+
+        return view('auth.two-factor-setup', [
+            'email' => $user->email,
+            'hasTransactionPassword' => $user->hasTransactionPassword(),
+            'codeSent' => $user->hasTransactionPassword() && TwoFactorSetupController::codeSent($request),
+            'codeTtlMinutes' => $twoFactor->codeTtlMinutes(),
+            'graceEndsAt' => $requirement->graceEndsAt($user),
+        ]);
     }
 }

@@ -164,6 +164,10 @@
     @if ($twoFactorAvailable)
         <x-card :title="__('panel.profile.two_factor_heading')" :description="__('panel.profile.two_factor_hint', ['email' => $user->email])" data-two-factor-card>
             <x-slot:actions>
+                @if ($twoFactorRequired)
+                    {{-- AUTH_TWO_FACTOR_REQUIRED alcança esta conta. --}}
+                    <x-badge color="blue" data-two-factor-required>{{ __('panel.profile.two_factor_required') }}</x-badge>
+                @endif
                 <x-badge :color="$twoFactorEnabled ? 'green' : 'gray'" data-two-factor-status>
                     {{ $twoFactorEnabled ? __('panel.profile.two_factor_on') : __('panel.profile.two_factor_off') }}
                 </x-badge>

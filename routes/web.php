@@ -24,6 +24,7 @@ use Twstec\Kit\Auth\Http\Controllers\RegisteredUserController;
 use Twstec\Kit\Auth\Http\Controllers\SensitiveActionController;
 use Twstec\Kit\Auth\Http\Controllers\TransactionPasswordController;
 use Twstec\Kit\Auth\Http\Controllers\TwoFactorChallengeController;
+use Twstec\Kit\Auth\Http\Controllers\TwoFactorSetupController;
 use Twstec\Kit\Foundation\Kit;
 use Twstec\Kit\Foundation\Localization\Http\Controllers\LocaleController;
 use Twstec\Kit\Foundation\Mail\Http\Controllers\MailPreviewController;
@@ -61,6 +62,9 @@ Route::get('mail-preview/{slug?}', MailPreviewController::class)->name('mail.pre
 // =============================================================================
 
 Route::middleware('guest')->group(function (): void {
+    // Cadastro público. Com AUTH_REGISTRATION_ENABLED=false, a tela e o envio
+    // respondem 404 (a tela confere no AuthPageController; o envio, no
+    // controller do pacote, antes da validação) e as telas não mostram o link.
     Route::get('register', [AuthPageController::class, 'register'])->name('register');
     Route::post('register', [RegisteredUserController::class, 'store']);
 
@@ -183,6 +187,18 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         ->name('sensitive-actions.code');
     Route::post('sensitive-actions/confirm', [SensitiveActionController::class, 'confirm'])
         ->name('sensitive-actions.confirm');
+
+    // Segundo fator OBRIGATÓRIO (AUTH_TWO_FACTOR_REQUIRED): a tela para onde
+    // o pacote leva quem ainda não ligou (EnsureTwoFactorIsConfigured, no
+    // grupo `web` — o resto do painel fica fechado até lá). Formulário comum,
+    // não componente Livewire: ação Livewire é recusada a quem está pendente.
+    // Os envios são do pacote (senha de transação → código → liga).
+    Route::get('two-factor/setup', [AuthPageController::class, 'twoFactorSetup'])
+        ->name('two-factor.setup');
+    Route::post('two-factor/setup/code', [TwoFactorSetupController::class, 'code'])
+        ->name('two-factor.setup.code');
+    Route::post('two-factor/setup', [TwoFactorSetupController::class, 'store'])
+        ->name('two-factor.setup.store');
 
     // Avatar do perfil: mesma função global de upload seguro da API
     // (SecureUploadService), restrita a imagens — re-encode GD antes de gravar.

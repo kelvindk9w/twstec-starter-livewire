@@ -124,6 +124,9 @@ return [
         'two_factor_recovery' => 'O código chega sempre ao e-mail da conta: sem acesso a ele, não há como concluir a entrada. Mantenha o e-mail seguro.',
         'two_factor_confirm_enable' => 'Para ligar a verificação em duas etapas, confirme com sua senha de transação e o código enviado por e-mail.',
         'two_factor_confirm_disable' => 'Para desligar a verificação em duas etapas, confirme com sua senha de transação e o código enviado por e-mail.',
+        'two_factor_required' => 'Obrigatória nesta instalação',
+        'two_factor_grace' => 'A verificação em duas etapas é obrigatória nesta instalação. Configure-a até :date — depois disso, o painel só abre com ela.',
+        'two_factor_grace_action' => 'Configurar agora',
     ],
 
     // Confirmação de ação sensível (modal compartilhado do painel: senha de

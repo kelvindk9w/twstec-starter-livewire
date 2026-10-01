@@ -222,6 +222,52 @@ return [
         'max_attempts_per_ip' => (int) env('AUTH_TWO_FACTOR_MAX_ATTEMPTS_PER_IP', 30),
         // Duração do bloqueio (janela dos dois contadores acima), em minutos.
         'lockout_minutes' => (int) env('AUTH_TWO_FACTOR_LOCKOUT_MINUTES', 15),
+
+        // OBRIGATÓRIO? (Twstec\Kit\Auth\Support\TwoFactorRequirement)
+        //   none   — opcional, cada conta decide (padrão);
+        //   admins — obrigatório para ADMINISTRADORES (quem entra no /admin:
+        //            `is_admin` ou um papel do painel — ver
+        //            Contracts\IdentifiesAdministrators);
+        //   all    — obrigatório para todas as contas.
+        // Valor desconhecido vale como `all` (falha fechada). Com a regra
+        // valendo, quem ainda não ligou é levado à tela de configuração antes
+        // de qualquer outra (painel, formulários, ações Livewire, endpoints
+        // de sessão), desligar é recusado no servidor (com registro na trilha
+        // de auditoria) e o /admin exige o segundo fator. A regra também
+        // torna a opção disponível mesmo com AUTH_TWO_FACTOR_ENABLED=false.
+        'required' => env('AUTH_TWO_FACTOR_REQUIRED', 'none'),
+
+        // Carência para quem JÁ EXISTIA quando a regra entrou: contas criadas
+        // antes de `required_since` (data, AAAA-MM-DD) podem adiar a
+        // configuração até `required_since` + `grace_days` dias. Contas
+        // criadas depois configuram já no primeiro acesso. 0 = sem carência.
+        // Carência sem data válida não vale (aviso no log a cada boot).
+        'grace_days' => (int) env('AUTH_TWO_FACTOR_GRACE_DAYS', 0),
+        'required_since' => env('AUTH_TWO_FACTOR_REQUIRED_SINCE'),
+
+        // Rotas (por NOME, aceita curinga) que quem ainda precisa configurar
+        // o segundo fator continua alcançando: a própria tela de
+        // configuração e os envios dela, sair, idioma, tema e definir a senha
+        // de transação (pré-requisito para ligar). Todo o resto do grupo
+        // `web` responde com o redirecionamento para a configuração (ou 403
+        // em JSON). Acrescentar uma rota aqui abre essa rota para quem está
+        // sem o segundo fator — faça só com motivo.
+        'setup_allowed_routes' => [
+            'two-factor.setup',
+            'two-factor.setup.*',
+            'logout',
+            'locale.switch',
+            'settings.theme',
+            'transaction-password.update',
+        ],
+    ],
+
+    // Cadastro público (Twstec\Kit\Auth\Support\Registration). Com `false`,
+    // GET e POST da rota de registro respondem 404 e as telas deixam de
+    // oferecer o link "Criar conta"; contas passam a nascer só por convite
+    // (twstec/kit-accounts) ou pelo /admin.
+    'registration' => [
+        'enabled' => (bool) env('AUTH_REGISTRATION_ENABLED', true),
     ],
 
 ];

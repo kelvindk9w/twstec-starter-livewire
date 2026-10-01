@@ -32,6 +32,23 @@ return [
         'disabled' => 'Verificación en dos pasos desactivada. El inicio de sesión vuelve a pedir solo la contraseña.',
     ],
 
+    // Configuración de la verificación en dos pasos OBLIGATORIA (AUTH_TWO_FACTOR_REQUIRED).
+    'two_factor_setup' => [
+        'title' => 'Configura la verificación en dos pasos',
+        'intro' => 'Esta instalación exige la verificación en dos pasos. Una vez configurada, cada inicio de sesión pide, además de la contraseña, un código enviado a :email.',
+        'grace' => 'Puedes posponerlo hasta el :date. Después, el panel solo se abre con la verificación configurada.',
+        'date_format' => 'd/m/Y',
+        'transaction_password_heading' => 'Primero, define tu contraseña de transacción',
+        'transaction_password_hint' => 'Activar la verificación es una acción sensible: se confirma con la contraseña de transacción (distinta de la de inicio de sesión) y un código por correo.',
+        'confirm_heading' => 'Confirma con tu contraseña de transacción',
+        'confirm_hint' => 'Enviaremos un código de 6 dígitos a tu correo.',
+        'send_code' => 'Enviar código',
+        'code_intro' => 'Enviamos un código de 6 dígitos a :email. Escríbelo abajo — es válido por :minutes minutos.',
+        'submit' => 'Activar y continuar',
+        'resend_hint' => '¿No llegó? Revisa el spam o pide otro código con tu contraseña de transacción.',
+        'later' => 'Configurar después',
+    ],
+
     // Cadenas de interfaz (formularios/pantallas de autenticación).
     'ui' => [
         'login_title' => 'Entrar',

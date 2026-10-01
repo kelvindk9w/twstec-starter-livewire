@@ -64,7 +64,9 @@
             @else
                 <div class="hidden sm:block"><x-theme-toggle /></div>
                 <a href="{{ route('login') }}" class="hidden rounded-md px-3 py-1.5 text-sm text-gray-600 underline-offset-4 transition-colors duration-150 ease-(--ease-out) hover:text-gray-900 hover:underline sm:inline-block dark:text-gray-300 dark:hover:text-white">{{ __('landing.nav.login') }}</a>
-                <x-button :href="route('register')" size="sm" class="hidden sm:inline-flex!">{{ __('landing.nav.register') }}</x-button>
+                @if (\Twstec\Kit\Auth\Support\Registration::enabled())
+                    <x-button :href="route('register')" size="sm" class="hidden sm:inline-flex!">{{ __('landing.nav.register') }}</x-button>
+                @endif
             @endauth
 
             {{-- Hambúrguer: só no mobile (a nav do site e, se logado, o
@@ -114,7 +116,9 @@
     <x-slot:footer>
         <div class="flex flex-col gap-3">
             @guest
-                <x-button :href="route('register')" class="w-full">{{ __('landing.nav.register') }}</x-button>
+                @if (\Twstec\Kit\Auth\Support\Registration::enabled())
+                    <x-button :href="route('register')" class="w-full">{{ __('landing.nav.register') }}</x-button>
+                @endif
                 <x-button :href="route('login')" variant="secondary" class="w-full">{{ __('landing.nav.login') }}</x-button>
             @else
                 <form method="POST" action="{{ route('logout') }}">

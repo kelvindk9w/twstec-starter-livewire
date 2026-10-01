@@ -32,6 +32,23 @@ return [
         'disabled' => 'Verificação em duas etapas desligada. O login volta a pedir só a senha.',
     ],
 
+    // Configuração do segundo fator OBRIGATÓRIO (AUTH_TWO_FACTOR_REQUIRED).
+    'two_factor_setup' => [
+        'title' => 'Configure a verificação em duas etapas',
+        'intro' => 'Esta instalação exige a verificação em duas etapas. Depois de configurada, cada login pede, além da senha, um código enviado para :email.',
+        'grace' => 'Você pode adiar até :date. Depois disso, o painel só abre com a verificação configurada.',
+        'date_format' => 'd/m/Y',
+        'transaction_password_heading' => 'Primeiro, defina sua senha de transação',
+        'transaction_password_hint' => 'Ligar a verificação é uma ação sensível: ela é confirmada com a senha de transação (diferente da senha de login) e um código por e-mail.',
+        'confirm_heading' => 'Confirme com sua senha de transação',
+        'confirm_hint' => 'Enviaremos um código de 6 dígitos para o seu e-mail.',
+        'send_code' => 'Enviar código',
+        'code_intro' => 'Enviamos um código de 6 dígitos para :email. Digite-o abaixo — ele vale por :minutes minutos.',
+        'submit' => 'Ligar e continuar',
+        'resend_hint' => 'Não chegou? Confira o spam ou peça outro código com a senha de transação.',
+        'later' => 'Configurar depois',
+    ],
+
     // Strings de interface (formulários/telas de autenticação).
     'ui' => [
         'login_title' => 'Entrar',

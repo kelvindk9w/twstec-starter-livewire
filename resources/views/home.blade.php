@@ -14,7 +14,9 @@
             @auth
                 <x-button :href="route('dashboard')">{{ __('panel.nav.dashboard') }}</x-button>
             @else
-                <x-button :href="route('register')">{{ __('landing.nav.register') }}</x-button>
+                @if (\Twstec\Kit\Auth\Support\Registration::enabled())
+                    <x-button :href="route('register')">{{ __('landing.nav.register') }}</x-button>
+                @endif
                 <x-button :href="route('login')" variant="secondary">{{ __('landing.nav.login') }}</x-button>
             @endauth
         </div>

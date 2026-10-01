@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { skipUnlessRegistrationOpen } from './support/registration.js';
 import { mailpitBaseUrl as mailpit } from './support/project-env.js';
 import { deleteAccountsViaAdmin, deleteMailpitMessagesTo } from './support/cleanup.js';
 
@@ -67,6 +68,8 @@ test.describe('contas com membros', () => {
         request,
     }) => {
         test.setTimeout(180_000);
+
+        await skipUnlessRegistrationOpen(request);
 
         const stamp = Date.now();
         const owner = `e2e-dona-${stamp}@example.com`;

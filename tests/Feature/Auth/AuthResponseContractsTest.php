@@ -61,7 +61,9 @@ it('registra uma implementação padrão para cada contrato', function () {
             ->and(app($contrato))->toBeInstanceOf($contrato);
     }
 
-    expect(AuthServiceProvider::RESPONSES)->toHaveCount(11);
+    // 11 dos fluxos de sempre + a configuração do segundo fator obrigatório
+    // (TwoFactorSetupResponse, issue #22).
+    expect(AuthServiceProvider::RESPONSES)->toHaveCount(12);
 });
 
 it('o padrão não passa por cima de uma resposta que o app já registrou', function () {

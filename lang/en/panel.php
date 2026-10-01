@@ -124,6 +124,9 @@ return [
         'two_factor_recovery' => 'The code always goes to the account email: without access to it, there is no way to finish signing in. Keep that email secure.',
         'two_factor_confirm_enable' => 'To turn on two-step verification, confirm with your transaction password and the code sent by email.',
         'two_factor_confirm_disable' => 'To turn off two-step verification, confirm with your transaction password and the code sent by email.',
+        'two_factor_required' => 'Required on this installation',
+        'two_factor_grace' => 'Two-step verification is required on this installation. Set it up by :date — after that, the panel only opens with it.',
+        'two_factor_grace_action' => 'Set up now',
     ],
 
     // Sensitive action confirmation (shared panel modal: transaction

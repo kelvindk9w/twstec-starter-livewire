@@ -1,5 +1,13 @@
 @php
     use App\Livewire\Support\Navigation;
+    use Twstec\Kit\Auth\Contracts\AuthUser;
+    use Twstec\Kit\Auth\Support\TwoFactorRequirement;
+
+    // Segundo fator obrigatório na CARÊNCIA (AUTH_TWO_FACTOR_GRACE_DAYS): até
+    // quando a conta pode adiar. Fora dela, o pacote já leva à configuração.
+    $twoFactorGrace = auth()->user() instanceof AuthUser
+        ? app(TwoFactorRequirement::class)->graceEndsAt(auth()->user())
+        : null;
 @endphp
 
 {{-- Painel do usuário. Mesmo cabeçalho, mesmo rodapé e mesma marca do site
@@ -35,6 +43,13 @@
             @kit('accounts')
                 <x-account-switcher class="mb-6 lg:hidden" />
             @endkit
+
+            @if ($twoFactorGrace !== null)
+                <x-alert type="warning" class="mb-6" data-two-factor-grace>
+                    {{ __('panel.profile.two_factor_grace', ['date' => $twoFactorGrace->translatedFormat(__('auth.two_factor_setup.date_format'))]) }}
+                    <a href="{{ route('two-factor.setup') }}" class="ml-1 font-medium underline">{{ __('panel.profile.two_factor_grace_action') }}</a>
+                </x-alert>
+            @endif
 
             {{ $slot }}
         </main>

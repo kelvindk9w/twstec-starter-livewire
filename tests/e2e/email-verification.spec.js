@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { skipUnlessRegistrationOpen } from './support/registration.js';
 import { mailpitBaseUrl as mailpit } from './support/project-env.js';
 import { deleteAccountViaAdmin, deleteMailpitMessagesTo } from './support/cleanup.js';
 
@@ -48,6 +49,8 @@ test.describe('verificação de e-mail no cadastro', () => {
 
     test('cadastro → aviso → e-mail no Mailpit → link → painel liberado', async ({ page, request, browser }) => {
         test.setTimeout(60_000);
+
+        await skipUnlessRegistrationOpen(request);
 
         const address = `e2e-verificacao-${Date.now()}@example.com`;
 

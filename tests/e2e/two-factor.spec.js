@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { skipUnlessRegistrationOpen } from './support/registration.js';
 import { mailpitBaseUrl as mailpit } from './support/project-env.js';
 import { deleteAccountViaAdmin, deleteMailpitMessagesTo } from './support/cleanup.js';
 
@@ -59,6 +60,8 @@ test.describe('verificação em duas etapas no login', () => {
 
     test('liga no perfil → sai → senha → código do Mailpit → painel', async ({ page, request, browser }) => {
         test.setTimeout(120_000);
+
+        await skipUnlessRegistrationOpen(request);
 
         const address = `e2e-2fa-${Date.now()}@example.com`;
         const seen = new Set();
