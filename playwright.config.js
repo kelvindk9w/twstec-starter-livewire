@@ -12,9 +12,17 @@ import { baseUrl, demoInstalled, installed } from './tests/e2e/support/project-e
 // Pré-requisitos (na raiz do projeto):
 //   1. O projeto no ar: docker compose up -d
 //      (o worker `queue` entrega os e-mails ao Mailpit).
-//   2. As pessoas fixas do E2E (idempotente — pode rodar sempre):
+//   2. As pessoas fixas do E2E (idempotente — rode antes de cada rodada e
+//      sempre que AUTH_TWO_FACTOR_REQUIRED mudar):
 //        docker compose exec -T app php artisan tinker \
 //          --execute="require 'tests/e2e/fixtures.php';"
+//
+// A suíte roda com AUTH_TWO_FACTOR_REQUIRED=none|admins|all e com o cadastro
+// aberto ou fechado (AUTH_REGISTRATION_ENABLED): quem decide é o servidor —
+// o login que pede código lê o código no Mailpit, a pessoa nova que cai na
+// configuração do segundo fator passa por ela, e sem cadastro a pessoa nova
+// nasce pelo /admin. Como trocar a combinação: a documentação de testes do
+// kit (docs/testes.md, "E2E com segundo fator obrigatório e cadastro fechado").
 //
 // Rodar em container (sem Node na máquina), na raiz do projeto:
 //   docker run --rm --network host --user $(id -u):$(id -g) -e HOME=/tmp \
@@ -39,6 +47,9 @@ export default defineConfig({
     // Autentica UMA vez e compartilha a sessão (o login tem rate limit —
     // throttle:sensitive). Ver tests/e2e/global-setup.js.
     globalSetup: './tests/e2e/global-setup.js',
+    // As mensagens das pessoas fixas (códigos de login e de confirmação) saem
+    // do Mailpit no fim da rodada. Ver tests/e2e/global-teardown.js.
+    globalTeardown: './tests/e2e/global-teardown.js',
     timeout: 30_000,
     retries: process.env.CI ? 1 : 0,
     reporter: [['list']],

@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
-import { signInToAdmin } from './admin.js';
-import { mailpitBaseUrl as mailpit } from './project-env.js';
+import { adminState } from './admin.js';
+
+export { deleteMailpitMessagesTo } from './mailpit.js';
 
 // =============================================================================
 // Limpeza dos specs que CRIAM dados no ambiente de dev (contas novas e
@@ -10,7 +11,10 @@ import { mailpitBaseUrl as mailpit } from './project-env.js';
 //
 // A conta sai pelo /admin (support/admin.js: o super admin demo, com a
 // demonstração instalada; o admin do E2E, sem ela): é o caminho que um
-// operador usaria, e passa pelas guardas do UserAdminGuard.
+// operador usaria, e passa pelas guardas do UserAdminGuard. A sessão é a que
+// o global-setup gravou (`adminState`), sem login novo: com o segundo fator
+// obrigatório, cada login pediria um código, e o código novo só sai depois do
+// intervalo de reenvio.
 // =============================================================================
 
 /**
@@ -28,13 +32,12 @@ import { mailpitBaseUrl as mailpit } from './project-env.js';
  * que também prova que a conta saiu, em vez de só confiar no aviso.
  */
 export async function deleteAccountViaAdmin(browser, address) {
-    const admin = await browser.newPage();
+    const context = await browser.newContext({ storageState: adminState });
+    const admin = await context.newPage();
     const search = `/admin/users?search=${encodeURIComponent(address)}`;
     const leftover = `limpeza E2E: a conta ${address} pode ter ficado no banco de dev`;
 
     try {
-        await signInToAdmin(admin);
-
         await admin.goto(search, { waitUntil: 'networkidle' });
         const row = admin.getByRole('row').filter({ hasText: address });
         const empty = admin.locator('.fi-ta-empty-state');
@@ -64,7 +67,7 @@ export async function deleteAccountViaAdmin(browser, address) {
         await admin.goto(search, { waitUntil: 'networkidle' });
         await expect(empty, `${leftover} (a busca ainda encontra a conta)`).toBeVisible({ timeout: 15_000 });
     } finally {
-        await admin.close();
+        await context.close();
     }
 }
 
@@ -81,12 +84,11 @@ export async function deleteAccountViaAdmin(browser, address) {
  * com a pessoa). Independente de idioma, como deleteAccountViaAdmin.
  */
 export async function deleteAccountsViaAdmin(browser, addresses) {
-    const admin = await browser.newPage();
+    const context = await browser.newContext({ storageState: adminState });
+    const admin = await context.newPage();
     let pending = [...addresses];
 
     try {
-        await signInToAdmin(admin);
-
         for (let round = 0; round <= addresses.length && pending.length > 0; round++) {
             const left = [];
 
@@ -101,7 +103,7 @@ export async function deleteAccountsViaAdmin(browser, addresses) {
 
         expect(pending, `limpeza E2E: contas que ficaram no banco de dev: ${pending.join(', ')}`).toEqual([]);
     } finally {
-        await admin.close();
+        await context.close();
     }
 }
 
@@ -136,16 +138,4 @@ async function tryDeleteRow(admin, address) {
     await admin.goto(search, { waitUntil: 'networkidle' });
 
     return (await empty.isVisible()) ? 'deleted' : 'refused';
-}
-
-/**
- * Apaga do Mailpit todas as mensagens enviadas para `address`.
- */
-export async function deleteMailpitMessagesTo(request, address) {
-    const search = await request.get(`${mailpit}/api/v1/search`, { params: { query: `to:"${address}"` } });
-    const ids = ((await search.json()).messages ?? []).map((m) => m.ID);
-
-    if (ids.length > 0) {
-        await request.delete(`${mailpit}/api/v1/messages`, { data: { IDs: ids } });
-    }
 }

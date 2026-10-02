@@ -1,6 +1,7 @@
-import { chromium } from '@playwright/test';
+import { chromium, request as requestFactory } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { signInToAdmin } from './support/admin.js';
+import { adminState, signInToAdmin } from './support/admin.js';
+import { signInToPanel } from './support/flows.js';
 import { installed, isolationProblem, mailpitBaseUrl, userEmail, userPassword } from './support/project-env.js';
 
 // =============================================================================
@@ -18,6 +19,10 @@ import { installed, isolationProblem, mailpitBaseUrl, userEmail, userPassword } 
 //   tests/e2e/fixtures.php);
 // - `admin.json`: o /admin (support/admin.js — o super admin demo, com a
 //   demonstração instalada; o admin do E2E, sem ela).
+//
+// SEGUNDO FATOR OBRIGATÓRIO (AUTH_TWO_FACTOR_REQUIRED=admins|all): as pessoas
+// fixas que a regra alcança já nascem com ele ligado (tests/e2e/fixtures.php)
+// e o login passa pelo código REAL, lido no Mailpit.
 // =============================================================================
 
 function refuse(problem) {
@@ -40,6 +45,7 @@ export default async function globalSetup(config) {
     writeFileSync('tests/e2e/.auth/suite-started-at', String(Date.now()));
 
     const browser = await chromium.launch();
+    const request = await requestFactory.newContext();
 
     try {
         const page = await browser.newPage({ baseURL });
@@ -51,12 +57,11 @@ export default async function globalSetup(config) {
             refuse(answered);
         }
 
-        await page.getByLabel('E-mail').fill(userEmail);
-        await page.getByLabel('Senha', { exact: true }).fill(userPassword);
-        await page.getByRole('button', { name: 'Entrar' }).click();
-        await page.waitForURL(/\/dashboard$/).catch(() => {
-            throw new Error(`global-setup: login de ${userEmail} não chegou ao painel — rode tests/e2e/fixtures.php (ver playwright.config.js)`);
-        });
+        await signInToPanel(page, request, userEmail, userPassword)
+            .then(() => page.waitForURL(/\/dashboard$/))
+            .catch(() => {
+                throw new Error(`global-setup: login de ${userEmail} não chegou ao painel — rode tests/e2e/fixtures.php (ver playwright.config.js)`);
+            });
 
         await page.context().storageState({ path: 'tests/e2e/.auth/e2e.json' });
 
@@ -65,10 +70,13 @@ export default async function globalSetup(config) {
         if (installed('admin')) {
             const admin = await browser.newPage({ baseURL });
 
-            await signInToAdmin(admin);
-            await admin.context().storageState({ path: 'tests/e2e/.auth/admin.json' });
+            await signInToAdmin(admin, request).catch((error) => {
+                throw new Error(`global-setup: o login no /admin falhou — rode tests/e2e/fixtures.php (ver playwright.config.js): ${error.message}`);
+            });
+            await admin.context().storageState({ path: adminState });
         }
     } finally {
+        await request.dispose();
         await browser.close();
     }
 }

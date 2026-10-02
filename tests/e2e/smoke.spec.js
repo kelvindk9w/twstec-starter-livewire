@@ -1,4 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { deleteMailpitMessagesWithMarker, waitForMessageWithMarker } from './support/mailpit.js';
+import { dotEnv } from './support/project-env.js';
+
+// O endereço de contato da plataforma (PLATFORM_CONTACT_EMAIL do .env), para
+// onde vai o formulário de contato.
+const contactEmail = dotEnv.PLATFORM_CONTACT_EMAIL ?? '';
 
 // Teste de fumaça E2E: a landing pública sobe e exibe o nome da plataforma
 // (que vem da config centralizada, nunca hardcoded no código).
@@ -70,20 +76,43 @@ test('landing no mobile: menu hambúrguer abre o drawer e o Esc fecha', async ({
     await expect(drawer).toBeHidden();
 });
 
-test('formulário de contato: envio válido mostra toast de sucesso', async ({ page }) => {
-    await page.goto('/#contato');
+test('formulário de contato: envio válido mostra toast de sucesso e a mensagem chega ao Mailpit', async ({ page, request }) => {
+    // Marcador único desta rodada no texto: acha a mensagem no Mailpit (ela
+    // vai para o endereço de contato da plataforma, não para uma pessoa do
+    // teste) e a apaga no fim, passando ou falhando — a rodada não deixa
+    // mensagem na caixa.
+    // Prefixo conhecido do global-teardown, que apaga o que a fila entregar
+    // depois do fim do teste.
+    const marker = `e2e-contato-${Date.now()}-${Math.floor(Math.random() * 1_000)}`;
 
-    await page.getByLabel('Nome', { exact: true }).fill('Maria E2E');
-    await page.getByLabel('E-mail', { exact: true }).fill('maria-e2e@example.com');
-    // `exact`: o SplitText da landing devolve o texto revelado num aria-label,
-    // e o subtítulo da seção contém a palavra "assunto". O rótulo do campo é
-    // exatamente "Assunto".
-    await page.getByLabel('Assunto', { exact: true }).selectOption('complaint');
-    await page.getByLabel('Mensagem', { exact: true }).fill('Mensagem de teste E2E do formulário de contato.');
-    await page.getByRole('button', { name: 'Enviar mensagem' }).click();
+    // A entrega passa pela fila, que divide o worker com o resto da suíte.
+    test.setTimeout(90_000);
 
-    // Redirect de volta + toast do kit com a confirmação.
-    await expect(page.locator('[data-toast]')).toContainText('Mensagem enviada');
+    try {
+        await page.goto('/#contato');
+
+        await page.getByLabel('Nome', { exact: true }).fill('Maria E2E');
+        await page.getByLabel('E-mail', { exact: true }).fill('maria-e2e@example.com');
+        // `exact`: o SplitText da landing devolve o texto revelado num aria-label,
+        // e o subtítulo da seção contém a palavra "assunto". O rótulo do campo é
+        // exatamente "Assunto".
+        await page.getByLabel('Assunto', { exact: true }).selectOption('complaint');
+        await page.getByLabel('Mensagem', { exact: true }).fill(`Mensagem de teste E2E do formulário de contato. ${marker}`);
+        await page.getByRole('button', { name: 'Enviar mensagem' }).click();
+
+        // Redirect de volta + toast do kit com a confirmação.
+        await expect(page.locator('[data-toast]')).toContainText('Mensagem enviada');
+
+        // A mensagem de verdade, entregue pelo worker da fila, com o texto enviado.
+        expect(contactEmail, 'PLATFORM_CONTACT_EMAIL no .env do projeto').not.toBe('');
+        const message = await waitForMessageWithMarker(request, contactEmail, marker, 60_000);
+        expect(message.Text).toContain(marker);
+        expect(message.Text).toContain('Maria E2E');
+    } finally {
+        if (contactEmail !== '') {
+            await deleteMailpitMessagesWithMarker(request, contactEmail, marker);
+        }
+    }
 });
 
 test('showcase: snippets copiam com feedback e o tema alterna claro/escuro', async ({ page, context }) => {

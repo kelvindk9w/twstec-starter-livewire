@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { skipUnlessRegistrationOpen } from './support/registration.js';
 import { mailpitBaseUrl as mailpit } from './support/project-env.js';
 import { deleteAccountViaAdmin, deleteMailpitMessagesTo } from './support/cleanup.js';
+import { completeTwoFactorSetup } from './support/flows.js';
 
 // =============================================================================
 // E2E da verificação de e-mail no cadastro, de ponta a ponta e sem atalho:
@@ -17,6 +18,10 @@ import { deleteAccountViaAdmin, deleteMailpitMessagesTo } from './support/cleanu
 // próprio teste apaga o que criou: a conta (pelo /admin — support/admin.js)
 // e as mensagens do Mailpit.
 // Ver tests/e2e/support/cleanup.js.
+//
+// Com o segundo fator obrigatório para todos (AUTH_TWO_FACTOR_REQUIRED=all),
+// o link leva antes à configuração dele (senha de transação → código do
+// Mailpit), e só então à página que a pessoa tentou abrir.
 // =============================================================================
 
 /**
@@ -94,11 +99,20 @@ test.describe('verificação de e-mail no cadastro', () => {
             expect(message.Text).toContain('/email/verify/');
 
             // Clicar no link (mesma sessão) libera o painel e devolve à última
-            // página que a pessoa tentou abrir (/api-keys), pelo SafeRedirect.
+            // página que a pessoa tentou abrir (/api-keys), pelo SafeRedirect —
+            // com o segundo fator obrigatório, depois de configurá-lo.
             await page.goto(link);
-            await expect(page).toHaveURL(/\/api-keys$/);
+            await expect(page).toHaveURL(/\/(api-keys|two-factor\/setup)$/);
+
+            if (new URL(page.url()).pathname === '/two-factor/setup') {
+                await completeTwoFactorSetup(page, request, address, new Set([id]), 'Transacao9Verif');
+                await expect(page).toHaveURL(/\/api-keys$/);
+                await expect(page.getByRole('status').filter({ hasText: 'Verificação em duas etapas ligada' })).toBeVisible();
+            } else {
+                await expect(page.getByRole('status').filter({ hasText: 'E-mail confirmado' })).toBeVisible();
+            }
+
             await expect(page.getByRole('heading', { level: 1 })).toContainText('Chaves de API');
-            await expect(page.getByRole('status').filter({ hasText: 'E-mail confirmado' })).toBeVisible();
 
             await page.goto('/dashboard');
             await expect(page).toHaveURL(/\/dashboard$/);

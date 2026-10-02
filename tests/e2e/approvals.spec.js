@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
+import { passAdminChallenge } from './support/admin.js';
+import { messagesAlreadyTo } from './support/mailpit.js';
 import { adminEmail, adminPassword, demoInstalled, mailpitBaseUrl as mailpit } from './support/project-env.js';
 
 // =============================================================================
@@ -66,15 +68,20 @@ async function submitModal(page, timeout = undefined) {
 /**
  * Entra direto numa tela do painel: o pedido sem sessão vai para o login, e o
  * login devolve à tela pedida (sem passar pelo dashboard — menos requisições
- * contra o teto por IP da borda, que a suíte inteira divide).
+ * contra o teto por IP da borda, que a suíte inteira divide). Com o segundo
+ * fator obrigatório (AUTH_TWO_FACTOR_REQUIRED=admins|all), o código REAL do
+ * Mailpit entra no formulário que o Filament troca no lugar do login.
  */
-async function signInAt(page, path, email, password) {
+async function signInAt(page, request, path, email, password) {
+    const seen = await messagesAlreadyTo(request, email);
+
     await page.goto(path);
     await page.waitForURL(/\/admin\/login$/);
     await livewireReady(page);
     await page.locator('input[type="email"]').fill(email);
     await page.locator('input[type="password"]').fill(password);
     await page.locator('form button[type="submit"]').first().click();
+    await passAdminChallenge(page, request, email, seen);
     await page.waitForURL((url) => url.pathname === path, { timeout: 15_000 });
     await livewireReady(page);
 }
@@ -211,7 +218,7 @@ demoTest('quatro olhos no /admin: quem pediu não aprova; outra pessoa aprova co
 
         await test.step('outra pessoa aprova: senha de transação → código do Mailpit → executa', async () => {
             const approverPage = await approverContext.newPage();
-            await signInAt(approverPage, requestPath, adminEmail, adminPassword);
+            await signInAt(approverPage, request, requestPath, adminEmail, adminPassword);
 
             const seen = await existingMessages(request, adminEmail);
 

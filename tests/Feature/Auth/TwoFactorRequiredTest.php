@@ -112,7 +112,7 @@ it('configuração completa: senha de transação → código → liga e volta �
         ->assertSessionHas('status', __('auth.verification_code.sent'));
 
     Mail::assertQueued(VerificationCodeMail::class, fn (VerificationCodeMail $mail): bool => $mail->hasTo($user->email)
-        && $mail->purpose === VerificationPurpose::SensitiveAction);
+        && $mail->purpose === VerificationPurpose::TwoFactorSetup);
 
     $this->get('/two-factor/setup')
         ->assertOk()
@@ -120,7 +120,7 @@ it('configuração completa: senha de transação → código → liga e volta �
         ->assertSeeHtml('data-two-factor-setup-code');
 
     // 3. Código → liga → volta para /profile, com o aviso.
-    $this->post('/two-factor/setup', ['code' => requiredTfaLastCode()])
+    $this->post('/two-factor/setup', ['code' => requiredTfaLastCode(VerificationPurpose::TwoFactorSetup)])
         ->assertRedirect(url('/profile'))
         ->assertSessionHas('status', __('auth.two_factor.setup_done'));
 
@@ -131,6 +131,43 @@ it('configuração completa: senha de transação → código → liga e volta �
 
     // Configurada, a tela de configuração devolve ao painel.
     $this->get('/two-factor/setup')->assertRedirect(route('dashboard'));
+});
+
+it('logo depois da configuração, a primeira confirmação de segurança manda o código na hora — o intervalo vale dentro de cada família', function (): void {
+    // O intervalo padrão (60 s), com o relógio parado no segundo: sem a
+    // família própria da configuração, o primeiro pedido abaixo esperaria.
+    config()->set('auth.verification.resend_cooldown_seconds', 60);
+    config()->set('auth.two_factor.required', 'all');
+    $this->freezeSecond();
+
+    $user = User::factory()->create(['transaction_password' => 'Trans4cao!Segura']);
+    $this->actingAs($user);
+
+    $this->from('/two-factor/setup')->post('/two-factor/setup/code', ['transaction_password' => 'Trans4cao!Segura'])
+        ->assertSessionHasNoErrors();
+    $this->post('/two-factor/setup', ['code' => requiredTfaLastCode(VerificationPurpose::TwoFactorSetup)])
+        ->assertSessionHasNoErrors();
+
+    expect($user->fresh()->two_factor_enabled_at)->not->toBeNull();
+
+    // No mesmo segundo: ainda pede a senha de transação certa…
+    $this->postJson('/sensitive-actions/code', ['transaction_password' => 'errada'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['transaction_password' => __('auth.transaction_password.invalid')]);
+
+    // …e, com ela, o código da confirmação sai sem "aguarde".
+    $this->postJson('/sensitive-actions/code', ['transaction_password' => 'Trans4cao!Segura'])
+        ->assertOk()
+        ->assertJsonPath('message', __('auth.verification_code.sent'));
+
+    $this->postJson('/sensitive-actions/confirm', ['code' => requiredTfaLastCode(VerificationPurpose::SensitiveAction)])
+        ->assertOk()
+        ->assertJsonStructure(['token', 'expires_at']);
+
+    // Dentro da família da confirmação, o intervalo continua: o próximo espera.
+    $this->postJson('/sensitive-actions/code', ['transaction_password' => 'Trans4cao!Segura'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['transaction_password' => __('auth.verification_code.resend_cooldown', ['seconds' => 60])]);
 });
 
 it('`all`: o próximo login, já configurado, pede o código do segundo fator', function (): void {
@@ -222,7 +259,7 @@ it('`admins`: o /admin exige o segundo fator, e a configuração devolve ao /adm
 
     $this->from('/two-factor/setup')->post('/two-factor/setup/code', ['transaction_password' => 'Trans4cao!Segura'])
         ->assertRedirect('/two-factor/setup');
-    $this->post('/two-factor/setup', ['code' => requiredTfaLastCode()])
+    $this->post('/two-factor/setup', ['code' => requiredTfaLastCode(VerificationPurpose::TwoFactorSetup)])
         ->assertRedirect(url('/admin/users'));
 
     $this->get('/admin/users')->assertOk();

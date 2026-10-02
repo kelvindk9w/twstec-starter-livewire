@@ -70,6 +70,17 @@ export const adminEmail = process.env.E2E_ADMIN_EMAIL ?? 'admin-e2e@example.com'
 export const adminPassword = process.env.E2E_ADMIN_PASSWORD ?? 'E2eAdminSenha123';
 
 /**
+ * A pessoa fixa SÓ do teste de "login pela tela" (mesma senha da de cima).
+ * Com o segundo fator obrigatório, cada login manda um código por e-mail, e
+ * um código novo só sai depois do intervalo de reenvio: o global-setup acabou
+ * de logar a pessoa comum.
+ */
+export const loginUserEmail = process.env.E2E_LOGIN_USER_EMAIL ?? 'login-e2e@example.com';
+
+/** As pessoas fixas (as mensagens delas saem do Mailpit no fim da rodada). */
+export const fixedPeople = [userEmail, loginUserEmail, adminEmail];
+
+/**
  * Os pacotes instalados, pelo registro do Composer (vendor/composer/
  * installed.json) — e não pela pasta em vendor/: no repositório do kit, os
  * pacotes são links para fora da pasta do starter, que o container do

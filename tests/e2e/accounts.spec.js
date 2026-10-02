@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { skipUnlessRegistrationOpen } from './support/registration.js';
 import { mailpitBaseUrl as mailpit } from './support/project-env.js';
 import { deleteAccountsViaAdmin, deleteMailpitMessagesTo } from './support/cleanup.js';
+import { completeTwoFactorSetup, newPerson } from './support/flows.js';
 
 // =============================================================================
 // E2E das CONTAS COM MEMBROS, de ponta a ponta e sem atalho:
 //
-// dona nova (cadastro + e-mail confirmado + senha de transação) → cria a conta
+// dona nova (cadastro + e-mail confirmado + senha de transação; com o
+// cadastro público fechado, criada pelo /admin) → cria a conta
 // de empresa e um projeto nela → convida por e-mail → o convite REAL chega ao
 // Mailpit → a pessoa convidada (sem conta) abre o link, cria o acesso e entra
 // na conta → vê o projeto da conta → troca para a conta pessoal (o projeto
@@ -18,6 +19,11 @@ import { deleteAccountsViaAdmin, deleteMailpitMessagesTo } from './support/clean
 // Limpeza no `finally`, passando ou falhando: as duas pessoas pelo /admin (a
 // conta de empresa sai junto com a última dona) e as mensagens do Mailpit.
 // Ver tests/e2e/support/cleanup.js.
+//
+// Com o segundo fator obrigatório (AUTH_TWO_FACTOR_REQUIRED=all), a dona e a
+// convidada passam pela configuração dele ao entrar (support/flows.js) — e a
+// transferência, logo depois, manda o código na hora: o código da
+// configuração é de outra família e não segura o da confirmação.
 // =============================================================================
 
 const loginPassword = 'SenhaForte123';
@@ -69,8 +75,6 @@ test.describe('contas com membros', () => {
     }) => {
         test.setTimeout(180_000);
 
-        await skipUnlessRegistrationOpen(request);
-
         const stamp = Date.now();
         const owner = `e2e-dona-${stamp}@example.com`;
         const member = `e2e-convidada-${stamp}@example.com`;
@@ -86,26 +90,23 @@ test.describe('contas com membros', () => {
         const memberPage = await memberContext.newPage();
 
         try {
-            await test.step('dona nova: cadastro, e-mail confirmado e senha de transação', async () => {
-                await ownerPage.goto('/register');
-                await ownerPage.getByLabel('Nome completo').fill('Dona E2E Contas');
-                await ownerPage.getByLabel('E-mail').fill(owner);
-                await ownerPage.getByLabel('Senha', { exact: true }).fill(loginPassword);
-                await ownerPage.getByLabel('Confirme a senha').fill(loginPassword);
-                await ownerPage.getByRole('button', { name: 'Criar conta' }).click();
-                await expect(ownerPage).toHaveURL(/\/email\/verify$/);
+            await test.step('dona nova: no painel, com senha de transação', async () => {
+                const { twoFactorRequired } = await newPerson(ownerPage, request, browser, {
+                    address: owner,
+                    name: 'Dona E2E Contas',
+                    password: loginPassword,
+                    transactionPassword,
+                    seen,
+                });
 
-                const message = await waitForMessage(request, owner, 'Confirme seu e-mail', seen);
-                const link = message.HTML.match(/href="([^"]*\/email\/verify\/[^"]+)"/)?.[1]?.replaceAll('&amp;', '&');
-                expect(link).toBeTruthy();
-                await ownerPage.goto(link);
-                await expect(ownerPage).toHaveURL(/\/dashboard$/);
-
-                await ownerPage.goto('/settings/transaction-password');
-                await ownerPage.getByLabel('Nova senha de transação').fill(transactionPassword);
-                await ownerPage.getByLabel('Confirme a senha').fill(transactionPassword);
-                await ownerPage.getByRole('button', { name: 'Salvar' }).click();
-                await expect(ownerPage.getByText('Senha de transação salva com sucesso.')).toBeVisible();
+                // A configuração obrigatória já definiu a senha de transação.
+                if (!twoFactorRequired) {
+                    await ownerPage.goto('/settings/transaction-password');
+                    await ownerPage.getByLabel('Nova senha de transação').fill(transactionPassword);
+                    await ownerPage.getByLabel('Confirme a senha').fill(transactionPassword);
+                    await ownerPage.getByRole('button', { name: 'Salvar' }).click();
+                    await expect(ownerPage.getByText('Senha de transação salva com sucesso.')).toBeVisible();
+                }
             });
 
             await test.step('cria a conta de empresa (vira a atual) e um projeto nela', async () => {
@@ -163,6 +164,13 @@ test.describe('contas com membros', () => {
                 await memberPage.getByRole('button', { name: 'Criar conta e aceitar' }).click();
 
                 // Sem passar pela verificação de e-mail: o link provou o e-mail.
+                // Com o segundo fator obrigatório, a configuração vem antes.
+                await expect(memberPage).toHaveURL(/\/(dashboard|two-factor\/setup)$/);
+
+                if (new URL(memberPage.url()).pathname === '/two-factor/setup') {
+                    await completeTwoFactorSetup(memberPage, request, member, seen, transactionPassword);
+                }
+
                 await expect(memberPage).toHaveURL(/\/dashboard$/);
                 await expect(memberPage.locator('main [data-current-account]')).toHaveText(company);
             });

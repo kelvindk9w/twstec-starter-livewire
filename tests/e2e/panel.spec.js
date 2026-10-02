@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { demoInstalled } from './support/project-env.js';
+import { deleteAccountViaAdmin, deleteMailpitMessagesTo } from './support/cleanup.js';
+import { newAddress, newPerson, signInToPanel } from './support/flows.js';
+import { demoInstalled, loginUserEmail } from './support/project-env.js';
 
 // =============================================================================
 // E2E do painel do usuário: login → dashboard, telas
@@ -13,7 +15,11 @@ import { demoInstalled } from './support/project-env.js';
 // as pessoas fixas de tests/e2e/fixtures.php).
 // =============================================================================
 
-const email = process.env.E2E_USER_EMAIL ?? 'e2e@example.com';
+// O login pela tela usa a pessoa fixa própria dele (login-e2e@example.com):
+// com o segundo fator obrigatório, o global-setup acabou de mandar código
+// para a pessoa comum, e o código novo dela só sairia depois do intervalo de
+// reenvio.
+const email = loginUserEmail;
 const password = process.env.E2E_USER_PASSWORD ?? 'E2eSenhaForte123';
 
 // PNG 96x96 REAL, embutido em base64: a validação de upload do kit lê o
@@ -28,11 +34,13 @@ const PNG_BASE64 =
 test.describe('sem autenticação', () => {
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    test('login → dashboard exibe saudação e navegação do painel', async ({ page }) => {
+    test('login → dashboard exibe saudação e navegação do painel', async ({ page, request }) => {
+        // Pela tela; com o segundo fator (quando a regra alcança a pessoa),
+        // o código REAL do Mailpit entra na tela do código.
         await page.goto('/login');
-        await page.getByLabel('E-mail').fill(email);
-        await page.getByLabel('Senha', { exact: true }).fill(password);
-        await page.getByRole('button', { name: 'Entrar' }).click();
+        await expect(page.getByLabel('E-mail')).toBeVisible();
+        await expect(page.getByLabel('Senha', { exact: true })).toBeVisible();
+        await signInToPanel(page, request, email, password);
 
         // Redireciona para o dashboard com a saudação personalizada...
         await expect(page).toHaveURL(/\/dashboard$/);
@@ -195,50 +203,6 @@ test.describe('regressões', () => {
     });
 
 
-    test('perfil: sobe a foto, ela vira o avatar do cabeçalho e o arquivo falso é recusado', async ({ page }) => {
-        await page.goto('/profile');
-
-        const cartao = page.locator('form').filter({ has: page.locator('input[type="file"]') });
-        const antes = await page.evaluate(() => Array.from(document.images).map((i) => i.src));
-
-        await cartao.locator('input[type="file"]').setInputFiles({
-            name: 'foto-valida.png',
-            mimeType: 'image/png',
-            buffer: Buffer.from(PNG_BASE64, 'base64'),
-        });
-        await cartao.getByRole('button', { name: /salvar foto/i }).click();
-        // Espera a foto salva virar imagem na página (o texto "foto" já estava
-        // lá — no botão —, e recarregar antes de o envio terminar perdia a
-        // foto: o teste falhava por pressa, não pelo produto).
-        await expect
-            .poll(() => page.evaluate(() => Array.from(document.images).some((i) => /\/storage\/avatars\//.test(i.src))), {
-                timeout: 15_000,
-            })
-            .toBe(true);
-
-        // A foto tem de sobreviver ao reload: o vínculo é do banco, não da
-        // sessão. E a URL é ASSINADA (política de uploads do kit: documento
-        // nunca em bucket público).
-        await page.reload({ waitUntil: 'networkidle' });
-        const src = await page.evaluate(
-            () => Array.from(document.images).map((i) => i.src).find((s) => /\/storage\/avatars\//.test(s)) ?? null,
-        );
-        expect(src).toBeTruthy();
-        expect(src).toMatch(/(signature|expires)=/i);
-        expect(antes).not.toContain(src);
-
-        // Arquivo que só PARECE imagem: recusado com mensagem, sem gravar.
-        await cartao.locator('input[type="file"]').setInputFiles({
-            name: 'nao-e-imagem.png',
-            mimeType: 'image/png',
-            buffer: Buffer.from('isto aqui e texto puro, apenas renomeado para .png'),
-        });
-        await cartao.getByRole('button', { name: /salvar foto/i }).click();
-        await expect(
-            page.getByText(/corrompida|não é permitido|não corresponde|inválida/i).first(),
-        ).toBeVisible({ timeout: 15000 });
-    });
-
     test('dashboard: métricas, gráfico e últimas chamadas da API', async ({ page }) => {
         await page.goto('/dashboard');
 
@@ -250,5 +214,78 @@ test.describe('regressões', () => {
         await expect(conteudo.getByText('Projetos', { exact: true }).first()).toBeVisible();
         await expect(page.getByRole('heading', { name: /Requisições por dia/ })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Últimas chamadas da API' })).toBeVisible();
+    });
+});
+
+// -----------------------------------------------------------------------------
+// Com uma pessoa NOVA (apagada no fim): a foto de perfil. Não usa a pessoa fixa
+// do e2e.json: a foto dela ficaria no banco e no disco de desenvolvimento a
+// cada rodada.
+// -----------------------------------------------------------------------------
+test.describe('com uma pessoa nova', () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test('perfil: sobe a foto, ela vira o avatar do cabeçalho e o arquivo falso é recusado', async ({ page, request, browser }) => {
+        test.setTimeout(90_000);
+
+        const address = newAddress('foto');
+        const seen = new Set();
+
+        try {
+            await newPerson(page, request, browser, {
+                address,
+                name: 'Pessoa Foto E2E',
+                password: 'SenhaForte123',
+                transactionPassword: 'Transacao9Foto',
+                seen,
+            });
+
+            await page.goto('/profile');
+
+            const cartao = page.locator('form').filter({ has: page.locator('input[type="file"]') });
+            const antes = await page.evaluate(() => Array.from(document.images).map((i) => i.src));
+
+            await cartao.locator('input[type="file"]').setInputFiles({
+                name: 'foto-valida.png',
+                mimeType: 'image/png',
+                buffer: Buffer.from(PNG_BASE64, 'base64'),
+            });
+            await cartao.getByRole('button', { name: /salvar foto/i }).click();
+            // Espera a foto salva virar imagem na página (o texto "foto" já estava
+            // lá — no botão —, e recarregar antes de o envio terminar perdia a
+            // foto: o teste falhava por pressa, não pelo produto).
+            await expect
+                .poll(() => page.evaluate(() => Array.from(document.images).some((i) => /\/storage\/avatars\//.test(i.src))), {
+                    timeout: 15_000,
+                })
+                .toBe(true);
+
+            // A foto tem de sobreviver ao reload: o vínculo é do banco, não da
+            // sessão. E a URL é ASSINADA (política de uploads do kit: documento
+            // nunca em bucket público).
+            await page.reload({ waitUntil: 'networkidle' });
+            const src = await page.evaluate(
+                () => Array.from(document.images).map((i) => i.src).find((s) => /\/storage\/avatars\//.test(s)) ?? null,
+            );
+            expect(src).toBeTruthy();
+            expect(src).toMatch(/(signature|expires)=/i);
+            expect(antes).not.toContain(src);
+
+            // Arquivo que só PARECE imagem: recusado com mensagem, sem gravar.
+            await cartao.locator('input[type="file"]').setInputFiles({
+                name: 'nao-e-imagem.png',
+                mimeType: 'image/png',
+                buffer: Buffer.from('isto aqui e texto puro, apenas renomeado para .png'),
+            });
+            await cartao.getByRole('button', { name: /salvar foto/i }).click();
+            await expect(
+                page.getByText(/corrompida|não é permitido|não corresponde|inválida/i).first(),
+            ).toBeVisible({ timeout: 15000 });
+        } finally {
+            // A pessoa sai pelo /admin e, com ela, a foto (registro e
+            // arquivo); as mensagens dela saem do Mailpit.
+            await deleteAccountViaAdmin(browser, address);
+            await deleteMailpitMessagesTo(request, address);
+        }
     });
 });
