@@ -17,6 +17,7 @@ use Twstec\Kit\Accounts\Account\Services\AccountService;
 use Twstec\Kit\Accounts\Accounts;
 use Twstec\Kit\Accounts\Deletion\Contracts\DeletionCheck;
 use Twstec\Kit\Accounts\Deletion\DeletionImpediment;
+use Twstec\Kit\Accounts\Deletion\DeletionImpediments;
 use Twstec\Kit\Accounts\Deletion\DeletionRequest;
 use Twstec\Kit\Admin\Approvals\ApprovalService;
 use Twstec\Kit\Admin\Approvals\Enums\ApprovalStatus;
@@ -53,15 +54,24 @@ use Twstec\Kit\Uploads\Services\SecureUploadService;
 /**
  * O verificador do exemplo da documentação: registros que a lei manda
  * guardar e que apontam para a conta.
+ *
+ * Criado DENTRO do teste (classe anônima), nunca declarado no topo do
+ * arquivo: numa instalação sem o twstec/kit-accounts a interface não existe,
+ * e uma classe de topo que a implementa derrubaria o carregamento da suíte
+ * inteira — os testes deste arquivo estão nos grupos `accounts` e `uploads`
+ * e pulam sozinhos sem os módulos (tests/TestCase.php).
  */
-final class RegistrosGuardadosDaConta implements DeletionCheck
+function registrosGuardadosDaConta(): DeletionCheck
 {
-    public function impediments(DeletionRequest $request): iterable
+    return new class implements DeletionCheck
     {
-        $total = DB::table('registros_guardados')->whereIn('account_id', $request->accountIds())->count();
+        public function impediments(DeletionRequest $request): iterable
+        {
+            $total = DB::table('registros_guardados')->whereIn('account_id', $request->accountIds())->count();
 
-        return $total === 0 ? [] : [new DeletionImpediment('retained_records', "Há {$total} registro(s) que a lei manda guardar.")];
-    }
+            return $total === 0 ? [] : [new DeletionImpediment('retained_records', "Há {$total} registro(s) que a lei manda guardar.")];
+        }
+    };
 }
 
 function criaRegistrosGuardados(): void
@@ -216,7 +226,7 @@ it('RESTRICT do aplicativo que ninguém declarou: excluir a CONTA pela página d
 
 it('declarado como IMPEDIMENTO: a recusa vem ANTES de pedir o código, com a mensagem do aplicativo junto do botão', function (): void {
     criaRegistrosGuardados();
-    config()->set('accounts.deletion.checks', [RegistrosGuardadosDaConta::class]);
+    app(DeletionImpediments::class)->register(registrosGuardadosDaConta());
 
     $empresa = app(AccountService::class)->createAccount('Empresa com registros', $this->ana);
     DB::table('registros_guardados')->insert(['account_id' => $empresa->id]);
