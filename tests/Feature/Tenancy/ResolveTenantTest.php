@@ -125,12 +125,12 @@ it('autoriza com scope exato e com wildcards', function (string $scopes, int $st
     'wildcard do recurso' => ['customers:*', 200],
     'wildcard total (padrão)' => ['*:*', 200],
     'ação diferente' => ['customers:create', 403],
-    'recurso diferente' => ['pix:create', 403],
+    'recurso diferente' => ['orders:create', 403],
 ]);
 
 it('nega scope ausente com 403 e mensagem indicando o scope exigido', function () {
     $user = User::factory()->create();
-    ['api_key' => $key, 'secret_key' => $secret] = criarChave($user, ['scopes' => ['pix:create']]);
+    ['api_key' => $key, 'secret_key' => $secret] = criarChave($user, ['scopes' => ['orders:create']]);
 
     $this->getJson('/api/v1/_test/customers', headersApi($key, $secret))
         ->assertForbidden()

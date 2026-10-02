@@ -5,6 +5,7 @@ namespace Tests;
 use App\Providers\Filament\AdminPanelProvider;
 use Composer\InstalledVersions;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use PDO;
 use RuntimeException;
 use Twstec\Kit\Foundation\Kit;
 
@@ -111,6 +112,56 @@ abstract class TestCase extends BaseTestCase
             ));
         }
 
+        if ($driver === 'pgsql') {
+            self::lockSuiteDatabase((array) config("database.connections.{$connection}"));
+        }
+
         return parent::setUpTraits();
+    }
+
+    /**
+     * Conexão que segura a trava da suíte no banco de teste, aberta uma vez
+     * por processo e mantida até ele acabar (estática: sobrevive à aplicação
+     * que cada teste recria).
+     */
+    private static ?PDO $suiteLock = null;
+
+    /**
+     * UMA SUÍTE POR VEZ NO BANCO DE TESTE (PostgreSQL). Duas execuções
+     * simultâneas contra o mesmo `<banco>_test` se atropelam: o
+     * `migrate:fresh` de uma apaga as tabelas no meio da outra, e o que um
+     * teste grava com commit (as conexões próprias dos testes de concorrência
+     * e do gatilho das contas demo) aparece na contagem de outro — falhas que
+     * vão e vêm conforme o horário. A primeira execução pega uma trava
+     * consultiva (`pg_try_advisory_lock`) numa conexão própria e a segura até
+     * acabar; a segunda para logo, com o motivo, em vez de falhar ao acaso.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private static function lockSuiteDatabase(array $config): void
+    {
+        if (self::$suiteLock !== null) {
+            return;
+        }
+
+        $database = (string) ($config['database'] ?? '');
+        $pdo = new PDO(
+            sprintf('pgsql:host=%s;port=%s;dbname=%s', $config['host'] ?? '127.0.0.1', $config['port'] ?? 5432, $database),
+            (string) ($config['username'] ?? ''),
+            (string) ($config['password'] ?? ''),
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+        );
+
+        $statement = $pdo->prepare('SELECT pg_try_advisory_lock(hashtext(?))');
+        $statement->execute(['tws-kit-test-suite:'.$database]);
+
+        if ($statement->fetchColumn() !== true) {
+            throw new RuntimeException(sprintf(
+                'Suíte recusada: outra execução está usando o banco de teste "%s" agora. Duas suítes ao mesmo tempo no mesmo banco se atropelam (migrate:fresh, linhas com commit) e dão falhas ao acaso — espere a outra terminar.',
+                $database,
+            ));
+        }
+
+        self::$suiteLock = $pdo;
     }
 }

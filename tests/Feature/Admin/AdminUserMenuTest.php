@@ -53,6 +53,11 @@ it('sem foto de perfil o avatar são as INICIAIS, desenhadas localmente (sem CDN
 });
 
 it('com foto de perfil o avatar é a foto do usuário', function () {
+    // A URL assinada leva a expiração em segundos e é gerada DUAS vezes (no
+    // menu e aqui, para comparar): com o relógio andando, a virada do segundo
+    // entre as duas a tornaria diferente. Relógio parado.
+    $this->freezeSecond();
+
     // A foto é PESSOAL (da pessoa, sem conta), enviada por ela.
     $upload = Upload::query()->create([
         'personal' => true,

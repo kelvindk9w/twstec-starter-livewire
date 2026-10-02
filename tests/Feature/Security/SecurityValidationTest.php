@@ -78,7 +78,7 @@ it('aplica redaction também no payload malicioso persistido (dupla camada)', fu
 it('deixa passar payload limpo sem marcar ataque', function () {
     $response = $this->postJson('/api/_test/echo', [
         'nome' => 'Maria Silva',
-        'mensagem' => 'Atenção: cobrança não paga será cancelada!',
+        'mensagem' => 'Atenção: inscrição não confirmada será cancelada!',
     ]);
 
     $response->assertOk()->assertJson(['ok' => true]);

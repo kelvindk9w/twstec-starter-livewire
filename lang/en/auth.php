@@ -72,7 +72,7 @@ return [
         'logout' => 'Sign out',
         'save' => 'Save',
         'transaction_password_title' => 'Transaction password',
-        'transaction_password_subtitle' => 'Used to authorize sensitive actions (withdrawals, API keys). It must be different from the login password.',
+        'transaction_password_subtitle' => 'Used to authorize sensitive actions (account deletion, API keys). It must be different from the login password.',
         'current_transaction_password' => 'Current transaction password',
         'new_transaction_password' => 'New transaction password',
         'dashboard_title' => 'Dashboard',

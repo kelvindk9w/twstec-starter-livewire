@@ -307,9 +307,13 @@ final class Show extends Component
     {
         $ordem = [AccountRole::Owner->value => 0, AccountRole::Admin->value => 1, AccountRole::Member->value => 2];
 
+        // O model de usuário configurado é este (App\Models\User): `ensure`
+        // confere na hora (falha fechada) e dá o tipo à análise estática.
         return $this->directory()->members($account)
+            ->ensure(User::class)
             ->map(function (User $pessoa) use ($papel): array {
-                $role = AccountRole::from((string) $pessoa->pivot->getAttribute('role'));
+                $vinculo = $pessoa->getRelation('pivot');
+                $role = AccountRole::from((string) $vinculo->getAttribute('role'));
                 $self = $pessoa->is($this->user());
 
                 return [
@@ -322,7 +326,7 @@ final class Show extends Component
                     'canPromote' => MemberRules::canChangeRole($papel, $role, AccountRole::Admin, $self),
                     'canDemote' => MemberRules::canChangeRole($papel, $role, AccountRole::Member, $self),
                     'canRemove' => MemberRules::canRemove($papel, $role, $self),
-                    'joined' => $pessoa->pivot->getAttribute('created_at'),
+                    'joined' => $vinculo->getAttribute('created_at'),
                 ];
             })
             ->sortBy(fn (array $m): string => $ordem[$m['role']->value].mb_strtolower($m['name']))

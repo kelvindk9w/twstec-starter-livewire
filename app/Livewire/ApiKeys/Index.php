@@ -57,10 +57,16 @@ final class Index extends Component
     /** Toggle "todas as permissões" (padrão). */
     public bool $allScopes = true;
 
-    /** @var list<string> Seleção granular "recurso:acao" (quando allScopes off). */
+    /**
+     * Seleção granular "recurso:acao" (quando allScopes off). Vem do
+     * navegador: pode chegar com chaves soltas — a validação confere cada
+     * item e o envio usa array_values().
+     *
+     * @var array<array-key, string>
+     */
     public array $selectedScopes = [];
 
-    /** @var list<string> UUIDs de projetos vinculados (vazio = conta toda). */
+    /** @var array<array-key, string> UUIDs de projetos vinculados (vazio = conta toda); vem do navegador, como acima. */
     public array $selectedProjectUuids = [];
 
     // --- Visualização ÚNICA da secreta ---------------------------------------
@@ -79,7 +85,7 @@ final class Index extends Component
     // --- Vínculo N:N chave ↔ projetos -------------------------------------------
     public ?string $editingProjectsKeyUuid = null;
 
-    /** @var list<string> */
+    /** @var array<array-key, string> Vem do navegador, como acima. */
     public array $editingProjectsSelection = [];
 
     // --- Fluxo de ação sensível (modal): estado no trait ConfirmsSensitiveAction.
@@ -216,7 +222,7 @@ final class Index extends Component
         $key = $this->findOwnedKey($uuid, ApiKeyAttempt::ProjectsSynced);
 
         $this->editingProjectsKeyUuid = $uuid;
-        $this->editingProjectsSelection = $key->projects->pluck('uuid')->all();
+        $this->editingProjectsSelection = $key->projects->map(fn (Project $projeto): string => (string) $projeto->uuid)->all();
     }
 
     public function cancelEditProjects(): void
@@ -238,7 +244,7 @@ final class Index extends Component
         // uuid de outra conta vira erro de validação (nunca 500 nem vínculo),
         // com a tentativa na trilha.
         try {
-            $projectIds = $apiKeys->resolveProjectIds($this->editingProjectsSelection);
+            $projectIds = $apiKeys->resolveProjectIds(array_values($this->editingProjectsSelection));
         } catch (\InvalidArgumentException) {
             $this->guard()->foreignProjects(ApiKeyAttempt::ProjectsSynced, $key->uuid);
 

@@ -72,7 +72,7 @@ return [
         'logout' => 'Sair',
         'save' => 'Salvar',
         'transaction_password_title' => 'Senha de transação',
-        'transaction_password_subtitle' => 'Usada para autorizar ações sensíveis (saques, chaves de API). Deve ser diferente da senha de login.',
+        'transaction_password_subtitle' => 'Usada para autorizar ações sensíveis (exclusão de conta, chaves de API). Deve ser diferente da senha de login.',
         'current_transaction_password' => 'Senha de transação atual',
         'new_transaction_password' => 'Nova senha de transação',
         'dashboard_title' => 'Painel',

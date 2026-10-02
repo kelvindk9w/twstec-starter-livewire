@@ -72,7 +72,7 @@ return [
         'logout' => 'Salir',
         'save' => 'Guardar',
         'transaction_password_title' => 'Contraseña de transacción',
-        'transaction_password_subtitle' => 'Se usa para autorizar acciones sensibles (retiros, claves de API). Debe ser diferente de la contraseña de acceso.',
+        'transaction_password_subtitle' => 'Se usa para autorizar acciones sensibles (eliminación de la cuenta, claves de API). Debe ser diferente de la contraseña de acceso.',
         'current_transaction_password' => 'Contraseña de transacción actual',
         'new_transaction_password' => 'Nueva contraseña de transacción',
         'dashboard_title' => 'Panel',

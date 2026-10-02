@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Livewire\Concerns\ConfirmsSensitiveAction;
 use App\Models\User;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -193,8 +194,11 @@ final class Profile extends Component
             'avatar' => __('panel.profile.avatar_heading'),
         ]);
 
+        // `required` acima: daqui em diante o arquivo existe.
+        $arquivo = $this->avatar ?? throw ValidationException::withMessages(['avatar' => __('validation.required', ['attribute' => __('panel.profile.avatar_heading')])]);
+
         try {
-            $avatars->replace($this->user(), $this->avatar);
+            $avatars->replace($this->user(), $arquivo);
         } catch (UploadRejectedException $exception) {
             throw ValidationException::withMessages(['avatar' => $exception->getMessage()]);
         }
@@ -252,7 +256,8 @@ final class Profile extends Component
 
     public function render(): View
     {
-        $user = $this->user()->fresh();
+        // A pessoa saiu do banco no meio da sessão: a mesma recusa do `auth`.
+        $user = $this->user()->fresh() ?? throw new AuthenticationException;
         $twoFactor = app(TwoFactorLogin::class);
         $twoFactorEnabled = $twoFactor->enabledFor($user);
 

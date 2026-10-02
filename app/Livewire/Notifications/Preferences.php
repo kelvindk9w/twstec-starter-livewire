@@ -10,7 +10,7 @@ use Livewire\Component;
 
 /**
  * Preferências de notificação (esqueleto preparado para as notificações
- * do projeto que herdar o kit — ex.: pagamentos).
+ * do projeto que herdar o kit — ex.: pedidos).
  *
  * Catálogo de toggles: config/notifications.php (defaults + flags 'locked').
  * A escolha do usuário fica no JSON users.notification_preferences; a leitura

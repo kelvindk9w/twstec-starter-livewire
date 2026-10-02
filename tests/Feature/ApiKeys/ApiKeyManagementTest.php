@@ -99,7 +99,7 @@ it('cria chave com scopes restritos e validade definida pelo usuário', function
 
     expect($chave->allows('customers:read'))->toBeTrue()
         ->and($chave->allows('customers:create'))->toBeFalse()
-        ->and($chave->allows('pix:create'))->toBeFalse()
+        ->and($chave->allows('orders:create'))->toBeFalse()
         ->and($chave->expires_at->equalTo($expira))->toBeTrue();
 });
 
@@ -228,7 +228,7 @@ it('rotação herda scopes e projetos da chave antiga', function () {
     // (rotacionar a SI MESMA é permitido à chave vinculada; rotacionar outra
     // chave, não — ApiKeyProjectBindingTest).
     ['api_key' => $antiga, 'secret_key' => $segredoAntigo] = criarChave($user, [
-        'scopes' => ['pix:create', 'api-keys:rotate'],
+        'scopes' => ['orders:create', 'api-keys:rotate'],
         'project_uuids' => [$projeto->uuid],
     ]);
 
@@ -238,7 +238,7 @@ it('rotação herda scopes e projetos da chave antiga', function () {
     ]);
 
     $response->assertCreated()
-        ->assertJsonPath('data.scopes', ['pix:create', 'api-keys:rotate']);
+        ->assertJsonPath('data.scopes', ['orders:create', 'api-keys:rotate']);
 
     $nova = comoSistema(fn () => ApiKey::query()->where('public_key', $response->json('data.public_key'))->sole());
 

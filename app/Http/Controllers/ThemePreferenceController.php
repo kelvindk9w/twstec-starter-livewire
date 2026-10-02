@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -23,7 +24,10 @@ final class ThemePreferenceController extends Controller
             'theme' => ['required', Rule::in(['light', 'dark', 'system'])],
         ]);
 
-        $request->user()->forceFill(['theme' => $validated['theme']])->save();
+        // Rota atrás do `auth`: sem pessoa logada, a mesma recusa do middleware.
+        $user = $request->user() ?? throw new AuthenticationException;
+
+        $user->forceFill(['theme' => $validated['theme']])->save();
 
         return response()->json(['theme' => $validated['theme']]);
     }

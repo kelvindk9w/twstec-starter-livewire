@@ -83,8 +83,8 @@ it('allows() resolve exatos, wildcards e escopos malformados', function () {
         ->and($checar(['customers:*'], 'customers:delete'))->toBeTrue()
         ->and($checar(['customers:read'], 'customers:read'))->toBeTrue()
         ->and($checar(['customers:read'], 'customers:write'))->toBeFalse()
-        ->and($checar(['customers:read'], 'pix:create'))->toBeFalse()
-        ->and($checar(['pix:create', 'customers:read'], 'customers:read'))->toBeTrue()
+        ->and($checar(['customers:read'], 'orders:create'))->toBeFalse()
+        ->and($checar(['orders:create', 'customers:read'], 'customers:read'))->toBeTrue()
         ->and($checar([], 'customers:read'))->toBeFalse()
         // Escopo-alvo sem ação = ação curinga implícita (só casa com wildcards).
         ->and($checar(['customers:*'], 'customers'))->toBeTrue()

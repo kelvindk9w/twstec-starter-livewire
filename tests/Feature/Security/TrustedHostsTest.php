@@ -39,6 +39,13 @@ function simulaProducaoHost(): void
  */
 
 beforeEach(function (): void {
+    // Cada teste começa como uma requisição num processo PHP novo: a lista de
+    // hosts confiáveis é estado ESTÁTICO do Symfony, e a requisição de um teste
+    // anterior (de qualquer arquivo) deixa nela os hosts da configuração DELE.
+    // Um middleware que lê o host antes do TrustHosts redeclarar a lista
+    // validaria contra essa sobra — o teste passava ou falhava conforme a
+    // ordem da suíte (`--order-by=random`).
+    Request::setTrustedHosts([]);
     config()->set('security.hosts.trusted', []);
     config()->set('app.url', 'https://app.example.com');
     TrustedHosts::flushAnnouncement();

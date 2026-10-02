@@ -21,10 +21,10 @@ it('renderiza os toggles do catálogo com os defaults do config', function () {
     Livewire::actingAs($user)
         ->test(Preferences::class)
         ->assertOk()
-        ->assertSee(__('panel.notifications.pref_payment_confirmed'))
+        ->assertSee(__('panel.notifications.pref_order_confirmed'))
         ->assertSee(__('panel.notifications.pref_security_alerts'))
         ->assertSee(__('panel.notifications.locked'))
-        ->assertSet('preferences.payment_confirmed', true);
+        ->assertSet('preferences.order_confirmed', true);
 });
 
 it('salva as preferências no JSON do usuário', function () {
@@ -32,13 +32,13 @@ it('salva as preferências no JSON do usuário', function () {
 
     Livewire::actingAs($user)
         ->test(Preferences::class)
-        ->set('preferences.payment_confirmed', false)
+        ->set('preferences.order_confirmed', false)
         ->set('preferences.final_customer_receipt', false)
         ->call('save');
 
     $user->refresh();
 
-    expect($user->notificationPreference('payment_confirmed'))->toBeFalse()
+    expect($user->notificationPreference('order_confirmed'))->toBeFalse()
         ->and($user->notificationPreference('final_customer_receipt'))->toBeFalse()
         ->and($user->notificationPreference('api_key_events'))->toBeTrue();
 });

@@ -93,12 +93,17 @@ it('as submissões antigas não trazem payload de ataque — só volume', functi
 
     $antigas = FormSubmission::query()->where('created_at', '<', now()->subDays(2))->get();
 
-    expect($antigas)->not->toBeEmpty();
+    // Quantas são "antigas" depende do sorteio do seeder: a conferência é
+    // sobre TODAS de uma vez (número fixo de asserções, a suíte não varia de
+    // contagem de uma rodada para outra) e aponta as que violarem.
+    $comAtaque = $antigas
+        ->filter(fn (FormSubmission $s): bool => str_contains((string) $s->message, '<script') || str_contains((string) $s->nickname, '<'))
+        ->map(fn (FormSubmission $s): string => (string) $s->getKey())
+        ->values()
+        ->all();
 
-    foreach ($antigas as $submissao) {
-        expect($submissao->message)->not->toContain('<script')
-            ->and($submissao->nickname)->not->toContain('<');
-    }
+    expect($antigas)->not->toBeEmpty()
+        ->and($comAtaque)->toBe([]);
 });
 
 it('as chaves de API semeadas são inertes: nenhuma secreta existe', function () {

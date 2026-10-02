@@ -75,7 +75,7 @@ final class AuthPageController
         }
 
         return view('auth.two-factor-challenge', [
-            'email' => $user->email,
+            'email' => $user->getEmailForVerification(),
             'codeTtlMinutes' => $twoFactor->codeTtlMinutes(),
         ]);
     }
@@ -94,7 +94,7 @@ final class AuthPageController
                 ->toResponse($request, new EmailVerificationResult(EmailVerificationOutcome::NotPending));
         }
 
-        return view('auth.verify-email', ['email' => $user->email]);
+        return view('auth.verify-email', ['email' => $user->getEmailForVerification()]);
     }
 
     public function transactionPassword(): View
@@ -119,7 +119,7 @@ final class AuthPageController
         }
 
         return view('auth.two-factor-setup', [
-            'email' => $user->email,
+            'email' => $user->getEmailForVerification(),
             'hasTransactionPassword' => $user->hasTransactionPassword(),
             'codeSent' => $user->hasTransactionPassword() && TwoFactorSetupController::codeSent($request),
             'codeTtlMinutes' => $twoFactor->codeTtlMinutes(),

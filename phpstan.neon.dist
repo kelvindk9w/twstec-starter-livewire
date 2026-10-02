@@ -1,0 +1,29 @@
+# ANÁLISE ESTÁTICA (Larastan — PHPStan com as regras do Laravel), nível 8, no
+# código do aplicativo (app/). Roda no CI do kit e no projeto criado:
+#
+#     ./vendor/bin/phpstan analyse
+#
+# Sem baseline: o código do starter passa limpo. Erro novo é para corrigir, não
+# para guardar numa lista de ignorados (docs/testes.md, "Análise estática").
+includes:
+    - vendor/larastan/larastan/extension.neon
+    - vendor/nesbot/carbon/extension.neon
+
+parameters:
+    paths:
+        - app/
+    level: 8
+
+    ignoreErrors:
+        # As peças NEUTRAS dos módulos opcionais (sem o /admin, sem a foto de
+        # perfil) só entram em uso quando o módulo NÃO está instalado
+        # (app/Support/optional-modules.php). Com o módulo, o PHPStan avisa que
+        # o trait não é usado — e por isso não é analisado; não há erro dentro
+        # dele a esconder. Num projeto criado SEM o módulo, o trait é usado e
+        # analisado, e esta entrada simplesmente não casa (reportUnmatched).
+        -
+            identifier: trait.unused
+            reportUnmatched: false
+            paths:
+                - app/Models/Concerns/Fallbacks/NoAdminPanelAccess.php
+                - app/Models/Concerns/Fallbacks/NoProfilePhoto.php

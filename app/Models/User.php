@@ -56,6 +56,13 @@ use Twstec\Kit\Foundation\Identifiers\RoutesByUuid;
  * NOME ANTIGO: até a 1.x este model era App\Core\Auth\Models\User. O nome
  * antigo continua resolvendo para esta classe (app/Support/legacy-aliases.php)
  * — payload de fila serializado antes da atualização o carrega.
+ *
+ * Colunas que a análise estática (Larastan) não acha nas migrations do
+ * aplicativo — vêm das migrations dos pacotes ou têm cast:
+ *
+ * @property string $uuid
+ * @property string $codigo_publico
+ * @property array<string, bool>|null $notification_preferences
  */
 #[Fillable(['name', 'email', 'password', 'locale'])]
 #[Hidden(['password', 'transaction_password', 'remember_token'])]
