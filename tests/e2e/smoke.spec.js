@@ -83,7 +83,14 @@ test('formulário de contato: envio válido mostra toast de sucesso e a mensagem
     // mensagem na caixa.
     // Prefixo conhecido do global-teardown, que apaga o que a fila entregar
     // depois do fim do teste.
-    const marker = `e2e-contato-${Date.now()}-${Math.floor(Math.random() * 1_000)}`;
+    //
+    // SEM sequência longa de dígitos: o envio passa pela máscara de número de
+    // cartão (FormSubmissionGuard → Redactor::maskCardNumbers), e um carimbo
+    // de 13 dígitos (Date.now()) que passa no Luhn — cerca de 1 em 10 — virava
+    // `************1` na mensagem entregue. O marcador ficava sem par, e o
+    // teste esperava 60 s em vão. Em base 36 o carimbo tem letras, e nenhum
+    // trecho chega perto dos 13 dígitos de um cartão.
+    const marker = `e2e-contato-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
     // A entrega passa pela fila, que divide o worker com o resto da suíte.
     test.setTimeout(90_000);
