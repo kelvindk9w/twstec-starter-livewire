@@ -44,13 +44,15 @@ pest()->in('Feature/Admin')->beforeEach(function (): void {
 });
 
 // MÓDULOS OPCIONAIS: os testes de um módulo que quem instala pode deixar de
-// fora (twstec/kit-accounts, twstec/kit-uploads, twstec/kit-admin) ficam no
+// fora (twstec/kit-accounts, twstec/kit-uploads, twstec/kit-admin,
+// twstec/kit-webhooks) ficam no
 // grupo com o nome dele — as pastas inteiras aqui, os casos soltos com
 // `->group(...)` no próprio arquivo. Sem o módulo, o grupo PULA sozinho
 // (tests/TestCase.php): cada combinação roda o `pest` de sempre. Um teste que
 // usa dois módulos fica nos dois grupos.
 pest()->group('accounts')->in(
     'Feature/Accounts',
+    'Feature/Webhooks',
     'Feature/Api',
     'Feature/ApiKeys',
     'Feature/Tenancy',
@@ -70,6 +72,10 @@ pest()->group('accounts')->in(
 pest()->group('uploads')->in(
     'Feature/Uploads',
     'Feature/Localization/UploadsPackageTranslationsOverrideTest.php',
+);
+
+pest()->group('webhooks')->in(
+    'Feature/Webhooks',
 );
 
 pest()->group('admin')->in(

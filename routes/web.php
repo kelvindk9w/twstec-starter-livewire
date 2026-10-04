@@ -13,6 +13,7 @@ use App\Livewire\Dashboard;
 use App\Livewire\Notifications\Preferences as NotificationPreferences;
 use App\Livewire\Profile;
 use App\Livewire\Projects\Index as ProjectsIndex;
+use App\Livewire\Webhooks\Index as WebhooksIndex;
 use Illuminate\Support\Facades\Route;
 use Twstec\Kit\Accounts\Account\Http\Controllers\AccountSwitchController;
 use Twstec\Kit\Accounts\Account\Http\Controllers\InvitationController;
@@ -92,10 +93,11 @@ Route::middleware('guest')->group(function (): void {
 });
 
 // =============================================================================
-// MÓDULOS OPCIONAIS. As telas de contas, chaves e projetos (twstec/kit-accounts)
-// e a foto de perfil (twstec/kit-uploads) só são registradas com o pacote
-// instalado — Kit::has(), o ponto único de detecção. Sem o pacote, a rota não
-// existe (404) e o menu não a mostra (App\Livewire\Support\Navigation).
+// MÓDULOS OPCIONAIS. As telas de contas, chaves e projetos (twstec/kit-accounts),
+// a foto de perfil (twstec/kit-uploads) e os webhooks (twstec/kit-webhooks) só
+// são registradas com o pacote instalado — Kit::has(), o ponto único de
+// detecção. Sem o pacote, a rota não existe (404) e o menu não a mostra
+// (App\Livewire\Support\Navigation).
 // =============================================================================
 
 // =============================================================================
@@ -171,6 +173,13 @@ Route::middleware(['auth', 'verified'])->group(function (): void {
         Route::get('accounts/{account}/open/{to}', OpenAccountController::class)
             ->middleware('signed:relative')
             ->name('accounts.open');
+    }
+
+    // Webhooks de saída da conta atual (twstec/kit-webhooks, que exige o de
+    // contas): endpoints, log de entregas e reenvio na mesma tela. As regras
+    // (papel, SSRF, ação sensível, trilha) são das Actions do pacote.
+    if (Kit::has('webhooks')) {
+        Route::get('webhooks', WebhooksIndex::class)->name('panel.webhooks');
     }
 
     // Senha de transação (hash separado da senha de login).

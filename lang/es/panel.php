@@ -12,6 +12,7 @@ return [
         'dashboard' => 'Panel',
         'api_keys' => 'Claves de API',
         'projects' => 'Proyectos',
+        'webhooks' => 'Webhooks',
         'notifications' => 'Notificaciones',
         'profile' => 'Perfil',
         'transaction_password' => 'Contraseña de transacción',

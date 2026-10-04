@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Twstec\Kit\Accounts\Account\Support\AccountDatabaseGuards;
+use Twstec\Kit\Foundation\Kit;
 
 // =============================================================================
 // MIGRAÇÃO 1.x → CONTAS no esquema COMPLETO do starter (SQLite e PostgreSQL —
@@ -27,7 +28,9 @@ function migracaoDoPacote(string $arquivo): Migration
 /**
  * As duas migrations das contas, a dos convites e a dos uploads da conta
  * (as duas últimas dependem de `accounts` por chave estrangeira: no
- * PostgreSQL elas saem antes e voltam depois).
+ * PostgreSQL elas saem antes e voltam depois). Os webhooks (módulo opcional)
+ * também dependem de `accounts`: com o módulo, a tabela deles sai primeiro e
+ * volta por último (migracaoDosWebhooks).
  *
  * @return array{criar: Migration, mover: Migration, convites: Migration, uploads: Migration}
  */
@@ -39,6 +42,17 @@ function migracoesDeContas(): array
         'convites' => migracaoDoPacote('2026_09_27_000001_create_account_invitations_table.php'),
         'uploads' => require base_path('vendor/twstec/kit-uploads/database/migrations/2026_09_28_000001_move_uploads_to_accounts.php'),
     ];
+}
+
+/**
+ * A migration dos webhooks (twstec/kit-webhooks), quando o módulo está
+ * instalado — as tabelas dele apontam para `accounts` e `projects`.
+ */
+function migracaoDosWebhooks(): ?Migration
+{
+    $arquivo = base_path('vendor/twstec/kit-webhooks/database/migrations/2026_10_03_000001_create_webhook_tables.php');
+
+    return Kit::has('webhooks') && is_file($arquivo) ? require $arquivo : null;
 }
 
 /**
@@ -69,7 +83,9 @@ it('no esquema do starter: conta pessoal com o mesmo id e uuid, dados movidos, t
     ['criar' => $criar, 'mover' => $mover, 'convites' => $convites, 'uploads' => $uploads] = migracoesDeContas();
 
     $pessoas = User::factory()->count(6)->create();
+    $webhooks = migracaoDosWebhooks();
 
+    $webhooks?->down();
     $uploads->down();
     $convites->down();
     $mover->down();
@@ -178,6 +194,7 @@ it('no esquema do starter: conta pessoal com o mesmo id e uuid, dados movidos, t
     $mover->up();
     $convites->up();
     $uploads->up();
+    $webhooks?->up();
 
     $conferir();
 })->group('uploads');
@@ -186,6 +203,8 @@ it('pessoa criada depois da migração: conta pessoal nova não colide com as mi
     ['criar' => $criar, 'mover' => $mover, 'convites' => $convites, 'uploads' => $uploads] = migracoesDeContas();
 
     User::factory()->count(3)->create();
+    $webhooks = migracaoDosWebhooks();
+    $webhooks?->down();
     $uploads->down();
     $convites->down();
     $mover->down();
@@ -194,6 +213,7 @@ it('pessoa criada depois da migração: conta pessoal nova não colide com as mi
     $mover->up();
     $convites->up();
     $uploads->up();
+    $webhooks?->up();
 
     $maiorAntes = (int) DB::table('accounts')->max('id');
     $nova = User::factory()->create();

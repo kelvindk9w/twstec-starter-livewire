@@ -79,6 +79,7 @@ final class Navigation
                 'items' => [
                     ['route' => 'panel.api-keys', 'label' => __('panel.nav.api_keys'), 'icon' => 'key', 'module' => 'accounts'],
                     ['route' => 'panel.projects', 'label' => __('panel.nav.projects'), 'icon' => 'folder', 'module' => 'accounts'],
+                    ['route' => 'panel.webhooks', 'label' => __('panel.nav.webhooks'), 'icon' => 'bolt', 'module' => 'webhooks'],
                 ],
             ],
             [

@@ -25,7 +25,7 @@ use Symfony\Component\Finder\Finder;
 //    de contas.
 // =============================================================================
 
-const ISOLATION_ACCOUNT_TABLES = ['accounts', 'account_memberships', 'account_invitations', 'projects', 'api_keys', 'api_key_project', 'uploads'];
+const ISOLATION_ACCOUNT_TABLES = ['accounts', 'account_memberships', 'account_invitations', 'projects', 'api_keys', 'api_key_project', 'uploads', 'webhook_endpoints', 'webhook_events', 'webhook_deliveries', 'webhook_delivery_attempts'];
 
 /**
  * Chamadas de modo sistema REVISADAS (arquivo => quantas), com o motivo.
@@ -61,6 +61,19 @@ const ISOLATION_SYSTEM_MODE_REVIEWED = [
     // Guarda legal como impedimento de exclusão: conta os uploads sob guarda
     // das contas que sairiam.
     'vendor/twstec/kit-uploads/src/Retention/LegalHoldDeletionCheck.php' => 1,
+    // Webhooks: a tentativa de entrega reserva a entrega e acha a conta dela
+    // (o job carrega só o id); o envio em si roda na conta (actingAs, abaixo).
+    'vendor/twstec/kit-webhooks/src/Delivery/DeliverySender.php' => 1,
+    // A fila caiu depois do commit (fora do contexto de quem disparou):
+    // desfaz a marca de "na fila" da entrega, pelo id.
+    'vendor/twstec/kit-webhooks/src/Delivery/DeliveryQueue.php' => 1,
+    // Outbox agendado: repõe na fila as entregas vencidas de todas as contas.
+    'vendor/twstec/kit-webhooks/src/Console/DispatchPendingDeliveries.php' => 1,
+    // Retenção agendada: apaga os eventos antigos de todas as contas.
+    'vendor/twstec/kit-webhooks/src/Console/PruneWebhookEvents.php' => 1,
+    // Exclusão da conta (apaga os webhooks dela) e da pessoa (tira o autor
+    // do que ela criou nas contas que ficam) — não são a conta atual de ninguém.
+    'vendor/twstec/kit-webhooks/src/Support/WebhookLifecycle.php' => 2,
     // O /admin inteiro (todas as requisições do painel, depois do acesso de
     // admin) — modo sistema da requisição (systemModeForRequest).
     'vendor/twstec/kit-admin/src/Http/Middleware/OperateAdminPanelAsSystem.php' => 1,
@@ -74,9 +87,17 @@ const ISOLATION_SYSTEM_MODE_REVIEWED = [
 
 /**
  * Chamadas de conta explícita (Accounts::actingAs) REVISADAS no código de
- * produção. Hoje nenhuma: a conta vem da sessão, da chave ou do job.
+ * produção. Fora destas, a conta vem da sessão, da chave ou do job.
  */
-const ISOLATION_ACTING_AS_REVIEWED = [];
+const ISOLATION_ACTING_AS_REVIEWED = [
+    // Webhooks: o aplicativo dispara o evento PARA UMA CONTA
+    // (Webhooks::dispatch($conta, ...)) — o outbox grava nela, qualquer que
+    // seja a conta atual de quem disparou.
+    'vendor/twstec/kit-webhooks/src/Delivery/Outbox.php' => 1,
+    // A tentativa de entrega roda na conta da entrega (a trilha de saída
+    // grava a conta certa; as gravações ficam nela).
+    'vendor/twstec/kit-webhooks/src/Delivery/DeliverySender.php' => 1,
+];
 
 /**
  * @return array<string, string> caminho relativo ao starter => conteúdo
@@ -242,7 +263,16 @@ it('conta explícita (actingAs) no código de produção só onde foi revisado',
         }
     }
 
-    expect($encontrado)->toBe(ISOLATION_ACTING_AS_REVIEWED);
+    // Sem o módulo instalado, os arquivos dele não existem (e não contam).
+    $revisado = array_filter(
+        ISOLATION_ACTING_AS_REVIEWED,
+        fn (string $caminho): bool => is_file(base_path($caminho)),
+        ARRAY_FILTER_USE_KEY,
+    );
+    ksort($encontrado);
+    ksort($revisado);
+
+    expect($encontrado)->toBe($revisado);
 });
 
 it('a porta de baixo nível do contexto (quadro de sistema, pilha) só é usada dentro do pacote de contas', function (): void {

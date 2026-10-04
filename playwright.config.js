@@ -39,6 +39,7 @@ const ignored = [
     ...(demoInstalled ? [] : ['**/smoke.spec.js', '**/landing.spec.js', '**/landing-v2.spec.js', '**/form-patterns.spec.js']),
     ...(installed('admin') ? [] : ['**/admin.spec.js', '**/approvals.spec.js']),
     ...(installed('accounts') ? [] : ['**/accounts.spec.js']),
+    ...(installed('webhooks') ? [] : ['**/webhooks.spec.js']),
 ];
 
 export default defineConfig({

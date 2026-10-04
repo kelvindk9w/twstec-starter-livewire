@@ -26,7 +26,7 @@ use Symfony\Component\Finder\Finder;
 // dentro de função ou closure, classe anônima, comentário, texto.
 // =============================================================================
 
-const OPTIONAL_MODULE_PREFIXES = ['Twstec\\Kit\\Accounts\\', 'Twstec\\Kit\\Uploads\\', 'Twstec\\Kit\\Admin\\', 'Filament\\'];
+const OPTIONAL_MODULE_PREFIXES = ['Twstec\\Kit\\Accounts\\', 'Twstec\\Kit\\Uploads\\', 'Twstec\\Kit\\Admin\\', 'Twstec\\Kit\\Webhooks\\', 'Filament\\'];
 
 /**
  * Declarações no topo do arquivo que estendem, implementam ou usam (trait) um

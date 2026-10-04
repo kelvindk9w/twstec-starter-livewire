@@ -18,6 +18,25 @@ export { deleteMailpitMessagesTo } from './mailpit.js';
 // =============================================================================
 
 /**
+ * Abre uma tela do /admin; se a borda responder 429 (a suíte inteira divide o
+ * limite de 300 requisições por minuto do mesmo IP, e a limpeza costuma cair
+ * no fim da rodada), espera o que o `Retry-After` pede e tenta de novo. A
+ * limpeza continua conferindo tudo: só não desiste por causa do limite.
+ */
+async function gotoAdmin(admin, url) {
+    for (let tentativa = 0; tentativa < 4; tentativa++) {
+        const response = await admin.goto(url, { waitUntil: 'networkidle' });
+
+        if (response?.status() !== 429) {
+            return;
+        }
+
+        const espera = Number(response.headers()['retry-after'] ?? 10);
+        await admin.waitForTimeout((Number.isFinite(espera) ? espera + 1 : 11) * 1_000);
+    }
+}
+
+/**
  * Exclui a conta `address` pelo /admin. Não faz nada se a conta não existe
  * (o teste pode ter falhado antes do cadastro).
  *
@@ -38,7 +57,7 @@ export async function deleteAccountViaAdmin(browser, address) {
     const leftover = `limpeza E2E: a conta ${address} pode ter ficado no banco de dev`;
 
     try {
-        await admin.goto(search, { waitUntil: 'networkidle' });
+        await gotoAdmin(admin, search);
         const row = admin.getByRole('row').filter({ hasText: address });
         const empty = admin.locator('.fi-ta-empty-state');
 
@@ -64,7 +83,7 @@ export async function deleteAccountViaAdmin(browser, address) {
         await expect(row, `${leftover} (a linha não saiu depois de confirmar)`).toHaveCount(0, { timeout: 15_000 });
 
         // Prova no servidor: a mesma busca, recarregada, volta vazia.
-        await admin.goto(search, { waitUntil: 'networkidle' });
+        await gotoAdmin(admin, search);
         await expect(empty, `${leftover} (a busca ainda encontra a conta)`).toBeVisible({ timeout: 15_000 });
     } finally {
         await context.close();
@@ -114,7 +133,7 @@ export async function deleteAccountsViaAdmin(browser, addresses) {
 async function tryDeleteRow(admin, address) {
     const search = `/admin/users?search=${encodeURIComponent(address)}`;
 
-    await admin.goto(search, { waitUntil: 'networkidle' });
+    await gotoAdmin(admin, search);
     const row = admin.getByRole('row').filter({ hasText: address });
     const empty = admin.locator('.fi-ta-empty-state');
 
@@ -135,7 +154,7 @@ async function tryDeleteRow(admin, address) {
         return 'refused';
     }
 
-    await admin.goto(search, { waitUntil: 'networkidle' });
+    await gotoAdmin(admin, search);
 
     return (await empty.isVisible()) ? 'deleted' : 'refused';
 }

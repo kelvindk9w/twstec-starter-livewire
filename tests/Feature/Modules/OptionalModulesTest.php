@@ -53,6 +53,7 @@ function rotasDeModulo(): array
         'invitations.register' => 'accounts',
         'invitations.decline' => 'accounts',
         'settings.avatar' => 'uploads',
+        'panel.webhooks' => 'webhooks',
     ];
 }
 
@@ -99,7 +100,7 @@ it('cada tela de módulo opcional existe só com o módulo instalado — e sem e
 
     $user = User::factory()->create();
 
-    foreach (['/api-keys' => 'accounts', '/projects' => 'accounts', '/account' => 'accounts', '/accounts/create' => 'accounts'] as $url => $modulo) {
+    foreach (['/api-keys' => 'accounts', '/projects' => 'accounts', '/account' => 'accounts', '/accounts/create' => 'accounts', '/webhooks' => 'webhooks'] as $url => $modulo) {
         if (! Kit::has($modulo)) {
             $this->actingAs($user)->get($url)->assertNotFound();
         }
@@ -112,6 +113,8 @@ it('o menu do painel mostra só as telas dos módulos instalados', function (): 
     foreach (['api_keys', 'projects', 'account'] as $item) {
         expect(in_array(__("panel.nav.{$item}"), $itens, true))->toBe(Kit::has('accounts'), $item);
     }
+
+    expect(in_array(__('panel.nav.webhooks'), $itens, true))->toBe(Kit::has('webhooks'));
 
     expect($itens)->toContain(__('panel.nav.dashboard'), __('panel.nav.profile'), __('panel.nav.notifications'), __('panel.nav.transaction_password'));
 });
@@ -163,7 +166,7 @@ it('a API continua limitada e com o envelope de erro, com ou sem o pacote de con
 // -----------------------------------------------------------------------------
 
 it('sem os módulos, o routes/web.php não registra as telas deles — e registra as da base', function (): void {
-    Kit::pretendAbsent('accounts', 'uploads');
+    Kit::pretendAbsent('accounts', 'uploads', 'webhooks');
 
     $rotas = rotasDoArquivoWeb();
 
@@ -182,8 +185,19 @@ it('com os módulos, o routes/web.php registra as telas deles', function (): voi
     }
 });
 
+it('sem webhooks (com contas), só a tela de webhooks sai do routes/web.php e do menu', function (): void {
+    Kit::pretendAbsent('webhooks');
+
+    $rotas = rotasDoArquivoWeb();
+
+    expect($rotas)->not->toContain('panel.webhooks')
+        ->and($rotas)->toContain('panel.api-keys', 'panel.projects')
+        ->and(itensDoMenu())->not->toContain(__('panel.nav.webhooks'))
+        ->toContain(__('panel.nav.api_keys'));
+})->group('accounts');
+
 it('sem contas, o menu perde o grupo de desenvolvimento e a página da conta', function (): void {
-    Kit::pretendAbsent('accounts', 'uploads');
+    Kit::pretendAbsent('accounts', 'uploads', 'webhooks');
 
     $grupos = array_column(Navigation::account(), 'label');
     $itens = itensDoMenu();
@@ -196,7 +210,7 @@ it('sem contas, o menu perde o grupo de desenvolvimento e a página da conta', f
 });
 
 it('sem contas, o painel abre com os atalhos da conta, sem chaves, projetos nem seletor de conta', function (): void {
-    Kit::pretendAbsent('accounts', 'uploads');
+    Kit::pretendAbsent('accounts', 'uploads', 'webhooks');
 
     $this->actingAs(User::factory()->create())
         ->get('/dashboard')

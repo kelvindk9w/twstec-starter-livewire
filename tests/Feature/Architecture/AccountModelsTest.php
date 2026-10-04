@@ -97,6 +97,13 @@ it('todo model com account_id carrega o escopo da conta atual', function (): voi
 
     // A descoberta não é cega: os models da conta de hoje estão lá.
     expect($comConta)->toContain(Project::class, ApiKey::class, ...(Kit::has('uploads') ? [Upload::class] : []))
+        // Os quatro models do pacote de webhooks (opcional), quando instalado.
+        ->and($comConta)->toContain(...(Kit::has('webhooks') ? [
+            'Twstec\\Kit\\Webhooks\\Models\\WebhookEndpoint',
+            'Twstec\\Kit\\Webhooks\\Models\\WebhookEvent',
+            'Twstec\\Kit\\Webhooks\\Models\\WebhookDelivery',
+            'Twstec\\Kit\\Webhooks\\Models\\WebhookDeliveryAttempt',
+        ] : [Project::class]))
         ->and($semEscopo)->toBe([]);
 })->group('accounts');
 
