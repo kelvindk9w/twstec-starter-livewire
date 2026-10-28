@@ -46,7 +46,7 @@
                 />
 
                 <div class="flex flex-wrap items-center justify-end gap-2">
-                    <x-button type="button" variant="ghost" wire:click="sendSensitiveCode" :disabled="$this->resendCooldown() > 0">
+                    <x-button type="button" variant="ghost" wire:click="resendSensitiveCode" :disabled="$this->resendCooldown() > 0">
                         @if ($this->resendCooldown() > 0)
                             {{ __('panel.sensitive.resend_in', ['seconds' => $this->resendCooldown()]) }}
                         @else

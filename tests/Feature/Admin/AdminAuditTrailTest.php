@@ -106,9 +106,14 @@ it('editar usuário grava user.updated só com os campos que mudaram (senha nova
 
     $evento = auditRow('user.updated', $alvo->uuid);
 
-    expect(array_keys($evento->changes))->toEqualCanonicalizing(['name', 'password'])
+    // Senha nova renova o remember_token (os cookies "lembrar de mim" antigos
+    // deixam de entrar — twstec/kit-auth, EndsOtherSessions): a trilha
+    // registra QUE mudou, nunca o valor.
+    expect(array_keys($evento->changes))->toEqualCanonicalizing(['name', 'password', 'remember_token'])
         ->and($evento->changes['name'])->toBe(['before' => 'C*** A***', 'after' => 'C*** N***'])
         ->and($evento->changes['password'])->toBe(['before' => '[REDACTED]', 'after' => '[REDACTED]'])
+        ->and($evento->changes['remember_token']['after'])->toBe('[REDACTED]')
+        ->and(json_encode($evento->getAttributes()))->not->toContain((string) $alvo->fresh()?->getRememberToken())
         ->and(json_encode($evento->getAttributes()))->not->toContain('Outra-Senha456');
 });
 

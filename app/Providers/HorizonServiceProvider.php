@@ -7,15 +7,20 @@ namespace App\Providers;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Horizon\HorizonApplicationServiceProvider;
-use Twstec\Kit\Admin\Access\AdminAccess;
+use Twstec\Kit\Admin\Access\HorizonAccess;
 use Twstec\Kit\Foundation\Kit;
 
 /**
  * Horizon: supervisor de filas + dashboard /horizon.
  *
- * Acesso ao dashboard: SÓ super admin com CONTA ATIVA — o MESMO critério do
- * painel /admin, lido do mesmo lugar (Twstec\Kit\Admin\Access\AdminAccess,
- * do pacote twstec/kit-admin). A barreira de origem
+ * Acesso ao dashboard: SÓ admin do /admin com CONTA ATIVA e com a permissão
+ * `horizon.access` no papel — o critério mora no pacote twstec/kit-admin
+ * (Twstec\Kit\Admin\Access\HorizonAccess, que confere a entrada no painel,
+ * Access\AdminAccess, antes do papel). De fábrica só o `owner` e a
+ * `operations` a têm (config/admin.php → authorization.roles): o Horizon
+ * mostra o payload dos jobs (dado pessoal) e deixa refazer e apagar job, e
+ * o `support` e a auditoria não abrem — `*.view` não casa com a permissão,
+ * de propósito. A barreira de origem
  * (EnsureAdminIpAllowed) também se aplica às rotas do Horizon — ver
  * config/horizon.php → middleware. Em ambiente local o pacote libera o acesso
  * sem gate (comportamento padrão dele, apenas desenvolvimento).
@@ -44,7 +49,7 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
     {
         Gate::define(
             'viewHorizon',
-            fn (?User $user = null): bool => Kit::has('admin') && AdminAccess::allows($user),
+            fn (?User $user = null): bool => Kit::has('admin') && HorizonAccess::allows($user),
         );
     }
 }

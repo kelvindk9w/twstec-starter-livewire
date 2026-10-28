@@ -1,0 +1,30 @@
+#!/bin/sh
+# =============================================================================
+# Os NOMES DO SITE para o nginx de produção (docker/nginx/prod.conf): lido
+# pelo entrypoint da imagem oficial do nginx antes de montar a configuração
+# (os .envsh do /docker-entrypoint.d são lidos no próprio shell dele).
+#
+# NGINX_SERVER_NAMES (separados por espaço: `exemplo.com.br www.exemplo.com.br`)
+# vence; sem ela, o host da APP_URL. Só letras, números, ponto, hífen e o
+# curinga `*` do nginx: qualquer outra coisa entraria na configuração como
+# diretiva — o container PARA, com o motivo.
+# =============================================================================
+
+if [ -z "${NGINX_SERVER_NAMES:-}" ]; then
+    kit_host=${APP_URL:-}
+    kit_host=${kit_host#*://}
+    kit_host=${kit_host%%/*}
+    kit_host=${kit_host%%:*}
+    NGINX_SERVER_NAMES=$kit_host
+    unset kit_host
+fi
+
+case "$NGINX_SERVER_NAMES" in
+    '' | *[!A-Za-z0-9.*\ -]*)
+        echo "[nginx] ABORTANDO: os nomes do site são inválidos ou faltam (NGINX_SERVER_NAMES='${NGINX_SERVER_NAMES}', APP_URL='${APP_URL:-}')." >&2
+        echo "[nginx] Defina PROD_APP_URL (https://seu-dominio) ou PROD_SERVER_NAMES (nomes separados por espaço) — ver docs/producao.md." >&2
+        exit 1
+        ;;
+esac
+
+export NGINX_SERVER_NAMES

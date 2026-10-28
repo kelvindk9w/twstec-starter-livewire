@@ -78,7 +78,7 @@ test.describe('landing /v2 — O Rastro', () => {
 
         // O api_secret é chave sensível: some por inteiro.
         await expect(card).toContainText('[REDACTED]', { timeout: 5000 });
-        await expect(card).not.toContainText('sk_live_2f9a41c7d0e84b6f');
+        await expect(card).not.toContainText('sk_demo_segredo_ficticio');
     });
 
     test('o som começa MUDO e o botão mostra o próprio estado', async ({ page }) => {

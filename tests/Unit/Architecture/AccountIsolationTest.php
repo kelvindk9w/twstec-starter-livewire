@@ -63,7 +63,11 @@ const ISOLATION_SYSTEM_MODE_REVIEWED = [
     'vendor/twstec/kit-uploads/src/Retention/LegalHoldDeletionCheck.php' => 1,
     // Webhooks: a tentativa de entrega reserva a entrega e acha a conta dela
     // (o job carrega só o id); o envio em si roda na conta (actingAs, abaixo).
-    'vendor/twstec/kit-webhooks/src/Delivery/DeliverySender.php' => 1,
+    // Mais dois: encerrar como falha as entregas "em envio" abandonadas que
+    // já usaram todas as tentativas (varredura de todas as contas, como o
+    // outbox); e gravar a tentativa falha quando o envio quebra antes de
+    // gravar — inclusive quando a conta da entrega já não existe.
+    'vendor/twstec/kit-webhooks/src/Delivery/DeliverySender.php' => 3,
     // A fila caiu depois do commit (fora do contexto de quem disparou):
     // desfaz a marca de "na fila" da entrega, pelo id.
     'vendor/twstec/kit-webhooks/src/Delivery/DeliveryQueue.php' => 1,

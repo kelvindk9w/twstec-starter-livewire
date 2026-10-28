@@ -6,8 +6,9 @@ use App\Models\User;
 use Twstec\Kit\Foundation\Security\Middleware\EnsureAdminIpAllowed;
 
 // =============================================================================
-// Acesso ao dashboard do Horizon (/horizon): SÓ
-// is_admin (gate viewHorizon), com a MESMA IP allowlist do /admin
+// Acesso ao dashboard do Horizon (/horizon): SÓ admin com a permissão
+// `horizon.access` no papel (gate viewHorizon → HorizonAccess do
+// twstec/kit-admin; de fábrica, owner e operations), com a MESMA IP allowlist do /admin
 // (EnsureAdminIpAllowed nas rotas do Horizon). Em ambiente local o pacote
 // libera geral (apenas desenvolvimento); aqui o ambiente é `testing`, então
 // o gate vale de verdade.
@@ -28,6 +29,22 @@ it('permite admin no dashboard', function () {
 
     $this->actingAs($admin)->get('/horizon')->assertOk();
 })->group('admin');
+
+it('papel sem `horizon.access` não abre o /horizon: suporte e auditoria recebem 403; operação e dono abrem', function (string $role, int $status) {
+    $admin = User::factory()->admin($role)->create();
+
+    $this->actingAs($admin)->get('/horizon')->assertStatus($status);
+
+    // A API de onde o dashboard lê os payloads segue o mesmo gate.
+    if ($status === 403) {
+        $this->actingAs($admin)->getJson('/horizon/api/jobs/failed')->assertForbidden();
+    }
+})->with([
+    'suporte' => ['support', 403],
+    'auditoria' => ['auditor', 403],
+    'operação' => ['operations', 200],
+    'dono' => ['owner', 200],
+])->group('admin');
 
 it('rotas do Horizon respeitam a IP allowlist do admin (EnsureAdminIpAllowed)', function () {
     expect(config('horizon.middleware'))->toContain(EnsureAdminIpAllowed::class);

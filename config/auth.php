@@ -147,7 +147,7 @@ return [
     // As dicas dos formulários são montadas a partir do que está ativo, e as
     // mensagens de erro já existem nos 3 idiomas (lang/*/validation.php).
     'password_rules' => [
-        'min_length' => (int) env('AUTH_PASSWORD_MIN', 6),
+        'min_length' => (int) env('AUTH_PASSWORD_MIN', 8),
         'letters' => (bool) env('AUTH_PASSWORD_LETTERS', false),
         'mixed_case' => (bool) env('AUTH_PASSWORD_MIXED_CASE', false),
         'numbers' => (bool) env('AUTH_PASSWORD_NUMBERS', false),
@@ -157,10 +157,28 @@ return [
 
     // Bloqueio por tentativas de login (throttle + contador).
     'login' => [
-        // Tentativas consecutivas antes do bloqueio.
+        // Tentativas erradas do MESMO cliente (e-mail + IP; IPv6 pelo
+        // prefixo) antes do bloqueio.
         'max_attempts' => (int) env('AUTH_LOGIN_MAX_ATTEMPTS', 5),
-        // Duração do bloqueio (decay do rate limiter), em minutos.
+        // Tentativas erradas contra a MESMA conta, somando todas as origens,
+        // antes do bloqueio — o teto de quem testa senhas de uma conta a
+        // partir de muitos IPs. Mais alto que o de cima: quem conhece o
+        // e-mail consegue bloquear a conta por uma janela; a redefinição de
+        // senha por e-mail zera este contador.
+        'max_attempts_per_account' => (int) env('AUTH_LOGIN_MAX_ATTEMPTS_PER_ACCOUNT', 20),
+        // Duração do bloqueio (janela dos dois contadores acima), em minutos.
         'lockout_minutes' => (int) env('AUTH_LOGIN_LOCKOUT_MINUTES', 15),
+    ],
+
+    // Conferência de senha de quem JÁ ESTÁ LOGADO (senha de login atual na
+    // troca de senha; senha de transação na ação sensível e na troca dela) —
+    // Twstec\Kit\Auth\Services\PasswordConfirmation. Tentativas erradas por
+    // conta e por senha, em qualquer front (inclusive ações Livewire, que não
+    // passam pelo throttle da rota); esgotadas, nem a senha certa passa até a
+    // janela acabar.
+    'password_confirmation' => [
+        'max_attempts' => (int) env('AUTH_PASSWORD_CONFIRMATION_MAX_ATTEMPTS', 5),
+        'lockout_minutes' => (int) env('AUTH_PASSWORD_CONFIRMATION_LOCKOUT_MINUTES', 15),
     ],
 
     // Senha de TRANSAÇÃO (separada da senha de login).

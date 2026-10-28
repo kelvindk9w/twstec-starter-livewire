@@ -5,10 +5,12 @@
 # instalados):
 #
 #   1. estilo (Pint)
-#   2. auditoria de dependências PHP (composer audit)
-#   3. auditoria de dependências Node (npm audit, só as de produção, alta+)
-#   4. build do front
-#   5. a suíte Pest contra o PostgreSQL (o banco <banco>_test do
+#   2. análise estática (Larastan nível 8, sem baseline — o
+#      phpstan.modules.php tira da análise as telas de módulo não instalado)
+#   3. auditoria de dependências PHP (composer audit)
+#   4. auditoria de dependências Node (npm audit, só as de produção, alta+)
+#   5. build do front
+#   6. a suíte Pest contra o PostgreSQL (o banco <banco>_test do
 #      phpunit.pgsql.xml, que o serviço db-init cria)
 #
 # Uso, na raiz do projeto:   scripts/verificar
@@ -34,6 +36,9 @@ passo() {
 
 passo 'Estilo (Pint)'
 docker compose run --rm --no-deps -T app ./vendor/bin/pint --test
+
+passo 'Análise estática (Larastan)'
+docker compose run --rm --no-deps -T app ./vendor/bin/phpstan analyse --no-progress --memory-limit=2G
 
 passo 'Auditoria de dependências PHP'
 docker compose run --rm --no-deps -T app composer audit --no-interaction

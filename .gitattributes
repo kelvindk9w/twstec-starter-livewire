@@ -18,3 +18,7 @@
 /tests/e2e/shots-admin.js export-ignore
 /tests/e2e/shots-panel.js export-ignore
 /tests/e2e/interactions.js export-ignore
+
+# Só do repositório do kit (monorepo): confere o docker-compose.yml da raiz,
+# que não existe no projeto criado.
+/tests/Feature/Architecture/MonorepoDevelopmentStackTest.php export-ignore

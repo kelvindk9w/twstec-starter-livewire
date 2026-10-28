@@ -22,7 +22,9 @@ use Twstec\Kit\Auth\Services\SensitiveActionService;
  *   - inclui o modal `livewire.partials.sensitive-action-modal`.
  *
  * Toda a regra (senha, código, tentativas, cooldown, token) é do
- * SensitiveActionService: aqui só há o estado da tela.
+ * SensitiveActionService: aqui só há o estado da tela. A senha de transação
+ * digitada é apagada do estado do componente logo depois do envio do código
+ * (com sucesso ou não) — nunca fica no snapshot do Livewire.
  */
 trait ConfirmsSensitiveAction
 {
@@ -49,10 +51,27 @@ trait ConfirmsSensitiveAction
             $sensitive->sendCode($this->sensitiveUser(), $this->sensitivePassword);
         } catch (ValidationException $exception) {
             throw $this->mapSensitiveErrors($exception);
+        } finally {
+            // A senha de transação é propriedade pública: ficaria no snapshot
+            // do componente (no HTML da página, a cada ida e volta) enquanto o
+            // modal estivesse aberto. Usada uma vez, sai — deu certo ou não.
+            $this->reset('sensitivePassword');
         }
 
         $this->codeSent = true;
         $this->reset('sensitiveCode');
+    }
+
+    /**
+     * Pedir OUTRO código volta ao passo da senha: cada código exige a senha de
+     * transação, e ela não fica guardada no componente entre um envio e
+     * outro.
+     */
+    public function resendSensitiveCode(): void
+    {
+        $this->resetValidation();
+        $this->codeSent = false;
+        $this->reset('sensitivePassword', 'sensitiveCode');
     }
 
     public function confirmSensitiveAction(SensitiveActionService $sensitive): void

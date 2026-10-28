@@ -69,3 +69,29 @@ it('o CI base: manual e semanal, só leitura, ações fixadas por commit', funct
 
     expect(is_executable(base_path('scripts/verificar')))->toBeTrue();
 });
+
+it('a análise estática roda no CI base e no scripts/verificar, com o mapa dos módulos opcionais', function (): void {
+    $ci = developmentFile('.github/workflows/ci.yml', 'docker/dev/ci.yml');
+    $verificar = (string) file_get_contents(base_path('scripts/verificar'));
+    $phpstan = (string) file_get_contents(base_path('phpstan.neon.dist'));
+
+    expect($ci)->toContain('./vendor/bin/phpstan analyse')
+        ->and($verificar)->toContain('./vendor/bin/phpstan analyse')
+        ->and($phpstan)->toMatch('/^includes:(\n\s+- .+)*\n\s+- phpstan\.modules\.php$/m');
+
+    // Com todos os módulos instalados (a suíte do kit), o mapa não exclui
+    // nem ignora nada: a análise cobre o app/ inteiro. Sem algum módulo, o
+    // que sai da análise é só dele — provado pelo Larastan na simulação de
+    // instalação do CI do kit.
+    $installed = array_filter(
+        ['webhooks', 'uploads', 'admin', 'accounts'],
+        static fn (string $module): bool => is_dir(base_path('vendor/twstec/kit-'.$module)),
+    );
+
+    if (count($installed) === 4) {
+        $modules = require base_path('phpstan.modules.php');
+
+        expect($modules['parameters']['excludePaths']['analyse'])->toBe([])
+            ->and($modules['parameters']['ignoreErrors'])->toBe([]);
+    }
+});

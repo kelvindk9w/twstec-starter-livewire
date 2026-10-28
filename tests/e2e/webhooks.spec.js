@@ -84,7 +84,11 @@ test.describe('webhooks', () => {
                 await page.locator('[data-webhook-event="*"]').check();
                 await page.getByTestId('webhook-save').click();
 
-                await expect(page.getByText('Este endereço é de serviço interno de nuvem e não é permitido.')).toBeVisible();
+                // O motivo exato (metadados de nuvem, rede interna, DNS) fica na trilha e
+                // no log: a tela mostra o mesmo texto para todos, para não servir de
+                // sonda da rede interna.
+                await expect(page.getByText('Não foi possível usar este endereço. Use um servidor público, acessível pela internet.')).toBeVisible();
+                await expect(page.getByText('Este endereço é de serviço interno de nuvem e não é permitido.')).toHaveCount(0);
                 await expect(page.locator('#sensitive-action')).toHaveCount(0);
             });
 

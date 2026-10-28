@@ -21,7 +21,8 @@ import { parseEnv } from 'node:util';
 //
 // No repositório do kit (o composer.json instala os pacotes por path
 // repository — `../../packages/…`), valem os endereços do docker-compose.yml
-// da raiz quando o .env não diz. (Por isso e não pela pasta packages/: o
+// da raiz quando o .env não diz (o Mailpit também por 127.0.0.1: aquele
+// compose também publica só em IPv4). (Por isso e não pela pasta packages/: o
 // container do Playwright monta só a pasta do starter.)
 // =============================================================================
 
@@ -45,7 +46,7 @@ export const kitRepository = (() => {
     }
 })();
 
-const KIT_REPOSITORY_DEFAULTS = { baseUrl: 'http://localhost:8180', mailpitUrl: 'http://localhost:18025' };
+const KIT_REPOSITORY_DEFAULTS = { baseUrl: 'http://localhost:8180', mailpitUrl: 'http://127.0.0.1:18025' };
 
 function missing(what, variable, key) {
     throw new Error(`E2E: não sei onde está ${what} deste projeto — defina ${variable} ou ${key} no .env da raiz do projeto (a pasta de onde o Playwright roda: ${root}).`);

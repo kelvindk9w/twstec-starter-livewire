@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -150,4 +151,116 @@ it('duas requisições com a mesma chave AO MESMO TEMPO, em processos separados,
 ])->skip(
     fn (): bool => DB::connection()->getDriverName() !== 'pgsql' || ! function_exists('pcntl_fork'),
     'Concorrência real: PostgreSQL e pcntl (rode com -c phpunit.pgsql.xml — o CI roda). A unicidade (escopo, chave) com ON CONFLICT DO NOTHING é o que este teste prova.',
+);
+
+// =============================================================================
+// A RETOMADA NÃO VENCE UMA CONCLUSÃO QUE CHEGA NO MEIO (PostgreSQL de verdade).
+//
+// A execução A (modo `transactional`) passou do prazo. A tentativa B lê a
+// linha (ainda "em processamento", prazo vencido: retomável). Nesse instante
+// — entre a leitura e o UPDATE de B, a janela da corrida, aberta aqui por um
+// ouvinte da consulta — A marca a chave concluída DENTRO da transação dela,
+// e a linha fica travada até o commit. O UPDATE da retomada de B espera a
+// trava; A confirma; o PostgreSQL reavalia o UPDATE de B contra a versão
+// confirmada. Como a condição exige "em processamento com prazo vencido" (não
+// só o dono), B perde, relê e recebe a conclusão — nunca uma segunda
+// execução.
+// =============================================================================
+
+it('a retomada que espera a trava da dona perde quando ela confirma a conclusão (sem segunda execução)', function (): void {
+    $schema = 'idem_takeover';
+    $base = config('database.connections.pgsql');
+    config()->set('database.connections.idem_takeover', [...$base, 'search_path' => $schema]);
+
+    DB::connection('idem_takeover')->statement("DROP SCHEMA IF EXISTS {$schema} CASCADE");
+    DB::connection('idem_takeover')->statement("CREATE SCHEMA {$schema}");
+
+    $default = DB::getDefaultConnection();
+    $tmp = sys_get_temp_dir().'/idem-takeover-'.bin2hex(random_bytes(4));
+    $scope = hash('sha256', 'escopo-da-corrida');
+    $key = hash('sha256', 'chave-da-corrida');
+    $corpo = hash('sha256', 'o-mesmo-corpo');
+
+    try {
+        Artisan::call('migrate', ['--database' => 'idem_takeover', '--force' => true]);
+        config()->set('idempotency.connection', 'idem_takeover');
+
+        $store = app(IdempotencyStore::class);
+
+        // A execução A: adquiriu e passou do prazo da retomada.
+        $a = $store->acquire($scope, $key, $corpo, 'POST', 'api/v1/pedidos', null, 120);
+        DB::connection('idem_takeover')->table(IdempotencyStore::TABLE)->update(['locked_until' => now()->subSecond()]);
+        DB::purge('idem_takeover');
+
+        $pid = pcntl_fork();
+
+        if ($pid === -1) {
+            throw new RuntimeException('pcntl_fork falhou');
+        }
+
+        if ($pid === 0) {
+            // FILHO = a execução A: conclui dentro da transação, segura a
+            // trava um pouco e confirma.
+            $herdada = DB::connection($default)->getPdo();
+            DB::purge($default);
+
+            try {
+                $limite = microtime(true) + 10;
+
+                while (! file_exists("{$tmp}-leu") && microtime(true) < $limite) {
+                    usleep(1000);
+                }
+
+                DB::connection('idem_takeover')->transaction(function () use ($store, $scope, $key, $a, $tmp): void {
+                    $store->complete($scope, $key, (string) $a->owner, 201, 'resposta-de-a', false);
+                    file_put_contents("{$tmp}-travada", '1');
+                    usleep(1_500_000);
+                });
+            } finally {
+                posix_kill(getmypid(), SIGKILL);
+            }
+        }
+
+        // PAI = a tentativa B. Logo depois de ela LER a linha, A conclui e
+        // trava; só então B segue para o UPDATE da retomada.
+        $leu = false;
+        DB::connection('idem_takeover')->listen(function (QueryExecuted $query) use (&$leu, $tmp): void {
+            if ($leu || ! str_starts_with(strtolower(ltrim($query->sql)), 'select') || ! str_contains($query->sql, IdempotencyStore::TABLE)) {
+                return;
+            }
+
+            $leu = true;
+            touch("{$tmp}-leu");
+            $limite = microtime(true) + 10;
+
+            while (! file_exists("{$tmp}-travada") && microtime(true) < $limite) {
+                usleep(1000);
+            }
+        });
+
+        $b = $store->acquire($scope, $key, $corpo, 'POST', 'api/v1/pedidos', null, 120);
+
+        pcntl_waitpid($pid, $status);
+
+        $linha = DB::connection('idem_takeover')->table(IdempotencyStore::TABLE)->first();
+
+        expect($leu)->toBeTrue()
+            ->and(file_exists("{$tmp}-travada"))->toBeTrue()
+            ->and($b->owner)->toBeNull()
+            ->and($b->existing?->completed())->toBeTrue()
+            ->and($linha->status)->toBe(IdempotencyStore::COMPLETED)
+            ->and($linha->owner)->toBe($a->owner)
+            ->and($linha->response)->toBe('resposta-de-a');
+    } finally {
+        config()->set('idempotency.connection', null);
+        DB::connection('idem_takeover')->statement("DROP SCHEMA IF EXISTS {$schema} CASCADE");
+        DB::purge('idem_takeover');
+
+        foreach (glob("{$tmp}-*") ?: [] as $file) {
+            @unlink($file);
+        }
+    }
+})->skip(
+    fn (): bool => DB::connection()->getDriverName() !== 'pgsql' || ! function_exists('pcntl_fork'),
+    'Concorrência real: PostgreSQL e pcntl (rode com -c phpunit.pgsql.xml — o CI roda).',
 );

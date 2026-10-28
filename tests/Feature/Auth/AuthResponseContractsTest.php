@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Symfony\Component\HttpFoundation\Response;
+use Twstec\Kit\Admin\Http\Responses\AdminSessionEndedResponse;
 use Twstec\Kit\Auth\Contracts\AuthUser;
 use Twstec\Kit\Auth\Contracts\Responses\EmailVerificationResponse;
 use Twstec\Kit\Auth\Contracts\Responses\FailedPasswordResetResponse;
@@ -19,6 +20,7 @@ use Twstec\Kit\Auth\Contracts\Responses\LogoutResponse;
 use Twstec\Kit\Auth\Contracts\Responses\PasswordResetLinkSentResponse;
 use Twstec\Kit\Auth\Contracts\Responses\PasswordResetResponse;
 use Twstec\Kit\Auth\Contracts\Responses\RegisterResponse;
+use Twstec\Kit\Auth\Contracts\Responses\SessionEndedResponse;
 use Twstec\Kit\Auth\Contracts\Responses\TwoFactorChallengeResponse;
 use Twstec\Kit\Auth\Contracts\Responses\TwoFactorLoginResponse;
 use Twstec\Kit\Auth\Contracts\Responses\TwoFactorRequiredResponse;
@@ -31,6 +33,7 @@ use Twstec\Kit\Auth\Providers\AuthServiceProvider;
 use Twstec\Kit\Auth\Support\EmailVerification;
 use Twstec\Kit\Auth\Support\EmailVerificationResult;
 use Twstec\Kit\Auth\Support\TwoFactorChallengeResult;
+use Twstec\Kit\Foundation\Kit;
 
 // =============================================================================
 // CONTRATOS DE RESPOSTA DA AUTENTICAÇÃO — o ponto de troca de um front.
@@ -57,13 +60,20 @@ function respostaDeTeste(string $contrato, mixed $dado = null): JsonResponse
 
 it('registra uma implementação padrão para cada contrato', function () {
     foreach (AuthServiceProvider::RESPONSES as $contrato => $padrao) {
-        expect(app($contrato))->toBeInstanceOf($padrao)
+        // Sessão encerrada: com o /admin instalado, o pacote do painel decora
+        // a resposta (manda ao login do painel quem estava nele).
+        $esperada = $contrato === SessionEndedResponse::class && Kit::has('admin')
+            ? AdminSessionEndedResponse::class
+            : $padrao;
+
+        expect(app($contrato))->toBeInstanceOf($esperada)
             ->and(app($contrato))->toBeInstanceOf($contrato);
     }
 
     // 11 dos fluxos de sempre + a configuração do segundo fator obrigatório
-    // (TwoFactorSetupResponse, issue #22).
-    expect(AuthServiceProvider::RESPONSES)->toHaveCount(12);
+    // (TwoFactorSetupResponse, issue #22) + a sessão encerrada por mudança de
+    // senha/segundo fator em outro aparelho (SessionEndedResponse).
+    expect(AuthServiceProvider::RESPONSES)->toHaveCount(13);
 });
 
 it('o padrão não passa por cima de uma resposta que o app já registrou', function () {

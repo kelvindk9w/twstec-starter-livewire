@@ -5,9 +5,14 @@
 #
 # Sem baseline: o código do starter passa limpo. Erro novo é para corrigir, não
 # para guardar numa lista de ignorados (docs/testes.md, "Análise estática").
+#
+# Projeto sem algum módulo opcional: o phpstan.modules.php tira da análise as
+# telas do módulo ausente (que continuam no app/ para o `tws:add`) — com todos
+# os módulos, não tira nada.
 includes:
     - vendor/larastan/larastan/extension.neon
     - vendor/nesbot/carbon/extension.neon
+    - phpstan.modules.php
 
 parameters:
     paths:

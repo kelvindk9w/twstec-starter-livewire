@@ -19,7 +19,8 @@ return [
     // Disco padrão de destino (Flysystem). Em produção: 's3' apontando para o
     // Cloudflare R2 (S3-compatível — ver seção AWS_* no .env.example).
     // Em dev/testes: 'local'. O SecureUploadService aceita disco por chamada;
-    // este é apenas o default.
+    // este é apenas o default. Disco PÚBLICO (`visibility => public`, como o
+    // `public` do Laravel) é recusado em produção.
     'disk' => env('UPLOADS_DISK', env('FILESYSTEM_DISK', 'local')),
 
     // Diretório base dentro do disco quando o chamador não informa um.

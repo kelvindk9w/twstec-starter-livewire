@@ -1,7 +1,8 @@
 # =============================================================================
 # CI do projeto — o mesmo conjunto do `scripts/verificar` (que roda local, no
-# Docker): Pint (estilo), auditorias de dependências (Composer e npm), o build
-# do front e a suíte Pest contra o PostgreSQL 18 (o banco de produção).
+# Docker): Pint (estilo), análise estática (Larastan), auditorias de
+# dependências (Composer e npm), o build do front e a suíte Pest contra o
+# PostgreSQL 18 (o banco de produção).
 #
 # QUANDO RODA: à mão (aba Actions → CI → "Run workflow") e uma vez por semana
 # (segunda, 06:00 UTC — pega dependência com falha de segurança nova mesmo sem
@@ -36,7 +37,7 @@ concurrency:
 
 jobs:
   verificar:
-    name: Pint · auditorias · build · Pest (PostgreSQL)
+    name: Pint · Larastan · auditorias · build · Pest (PostgreSQL)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -86,6 +87,9 @@ jobs:
 
       - name: Estilo (Pint)
         run: ./vendor/bin/pint --test
+
+      - name: Análise estática (Larastan)
+        run: ./vendor/bin/phpstan analyse --no-progress --memory-limit=2G
 
       - name: Auditoria de dependências PHP
         run: composer audit --no-interaction

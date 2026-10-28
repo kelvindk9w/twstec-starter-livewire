@@ -17,7 +17,7 @@ use Twstec\Kit\Demo\Database\Seeders\DemoUserSeeder;
 function politicaDeSenha(array $overrides = []): void
 {
     config()->set('auth.password_rules', array_merge([
-        'min_length' => 6,
+        'min_length' => 8,
         'letters' => false,
         'mixed_case' => false,
         'numbers' => false,
@@ -31,20 +31,20 @@ function validaSenha(string $senha): Illuminate\Validation\Validator
     return Validator::make(['password' => $senha], ['password' => PasswordPolicy::rule()]);
 }
 
-it('por padrão só exige o tamanho mínimo (6): senha simples passa, curta não', function () {
+it('por padrão só exige o tamanho mínimo (8): senha simples passa, curta não', function () {
     politicaDeSenha();
 
-    expect(validaSenha('abcdef')->passes())->toBeTrue()
-        ->and(validaSenha('abcde')->passes())->toBeFalse();
+    expect(validaSenha('abcdefgh')->passes())->toBeTrue()
+        ->and(validaSenha('abcdefg')->passes())->toBeFalse();
 });
 
-it('o padrão de fábrica é 6 caracteres e nenhuma regra extra ligada', function () {
+it('o padrão de fábrica é 8 caracteres e nenhuma regra extra ligada', function () {
     // "Fábrica" = o que uma instalação nova recebe: o .env.example (copiado
     // para .env no clone) e as chaves que o config expõe. O .env de quem
     // roda os testes pode ter outro valor — por isso não se lê config() aqui.
     $exemplo = file_get_contents(base_path('.env.example'));
 
-    expect($exemplo)->toContain("\nAUTH_PASSWORD_MIN=6\n")
+    expect($exemplo)->toContain("\nAUTH_PASSWORD_MIN=8\n")
         ->and($exemplo)->toContain('#AUTH_PASSWORD_LETTERS=true')
         ->and($exemplo)->toContain('#AUTH_PASSWORD_MIXED_CASE=true')
         ->and($exemplo)->toContain('#AUTH_PASSWORD_NUMBERS=true')
@@ -61,10 +61,10 @@ it('cada regra extra passa a ser cobrada ao ser ligada', function (string $regra
     expect(validaSenha($senhaQueFalha)->passes())->toBeFalse("[$regra] deveria recusar '$senhaQueFalha'")
         ->and(validaSenha($senhaQuePassa)->passes())->toBeTrue("[$regra] deveria aceitar '$senhaQuePassa'");
 })->with([
-    'letras' => ['letters', '123456', 'abc123'],
-    'maiúscula e minúscula' => ['mixed_case', 'abcdef', 'Abcdef'],
-    'número' => ['numbers', 'abcdef', 'abcde1'],
-    'símbolo' => ['symbols', 'abcdef', 'abcde!'],
+    'letras' => ['letters', '12345678', 'abcd1234'],
+    'maiúscula e minúscula' => ['mixed_case', 'abcdefgh', 'Abcdefgh'],
+    'número' => ['numbers', 'abcdefgh', 'abcdefg1'],
+    'símbolo' => ['symbols', 'abcdefgh', 'abcdefg!'],
 ]);
 
 it('o tamanho mínimo configurado é respeitado', function () {
@@ -78,7 +78,7 @@ it('a dica dos formulários descreve só o que está ativo', function () {
     app()->setLocale('pt_BR');
 
     politicaDeSenha();
-    expect(PasswordPolicy::hint())->toBe('mínimo de 6 caracteres');
+    expect(PasswordPolicy::hint())->toBe('mínimo de 8 caracteres');
 
     politicaDeSenha(['min_length' => 10, 'mixed_case' => true, 'numbers' => true]);
     expect(PasswordPolicy::hint())

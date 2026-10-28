@@ -113,10 +113,28 @@ if [ ! -e public/storage ]; then
     php artisan storage:link --no-interaction >/dev/null 2>&1 || true
 fi
 
-# Publica os arquivos estáticos no volume compartilhado com o nginx
-# (o nginx de produção não tem o código — recebe só o public/ read-only).
+# Publica os arquivos estáticos no volume compartilhado com o nginx (o nginx
+# de produção não tem o código — recebe só o public/, read-only). É uma
+# SINCRONIA, não uma cópia por cima: o volume persiste entre as versões, e o
+# que a versão nova não tem mais (os assets do build anterior, com outro hash)
+# sai. Primeiro entra o novo, depois sai o que sobrou — o nginx nunca fica com
+# a pasta vazia no meio do deploy. Falha aqui PARA a subida (set -e): um site
+# com os assets da versão anterior é pior que um container que não sobe.
+#
+# O link public/storage vai junto, como link: ele aponta para
+# /var/www/html/storage/app/public, que o container do nginx NÃO tem — o
+# disco `public` do Laravel não é servido pelo nginx nesta stack (ver
+# docs/producao.md, "Arquivos do disco public").
 if [ -d /app-public ]; then
-    cp -r /var/www/html/public/. /app-public/ 2>/dev/null || true
+    cp -a /var/www/html/public/. /app-public/
+    (
+        cd /app-public
+        find . -mindepth 1 -depth | while IFS= read -r entry; do
+            if [ ! -e "/var/www/html/public/$entry" ] && [ ! -L "/var/www/html/public/$entry" ]; then
+                rm -rf "./$entry"
+            fi
+        done
+    )
 fi
 
 exec "$@"

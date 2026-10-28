@@ -8,7 +8,6 @@ use App\Livewire\Concerns\ConfirmsSensitiveAction;
 use App\Models\User;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
@@ -17,6 +16,7 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Twstec\Kit\Auth\Exceptions\TwoFactorRequiredException;
 use Twstec\Kit\Auth\PasswordPolicy;
+use Twstec\Kit\Auth\Services\PasswordConfirmation;
 use Twstec\Kit\Auth\Services\TransactionPasswordService;
 use Twstec\Kit\Auth\Services\TwoFactorLogin;
 use Twstec\Kit\Foundation\Kit;
@@ -89,10 +89,15 @@ final class Profile extends Component
     }
 
     /**
-     * Troca da senha de LOGIN: exige a senha atual e aplica as mesmas
+     * Troca da senha de LOGIN: exige a senha atual (com limite de tentativas
+     * erradas por conta — PasswordConfirmation, do pacote) e aplica as mesmas
      * regras de força do cadastro (config/auth.php password_rules).
+     *
+     * Trocar a senha encerra as OUTRAS sessões da conta e invalida os cookies
+     * "lembrar de mim" — regra do model (twstec/kit-auth, EndsOtherSessions);
+     * esta sessão continua aberta.
      */
-    public function updatePassword(): void
+    public function updatePassword(PasswordConfirmation $passwords): void
     {
         $validated = $this->validate([
             'currentPassword' => ['required', 'string'],
@@ -109,7 +114,9 @@ final class Profile extends Component
 
         $user = $this->user();
 
-        if (! Hash::check($validated['currentPassword'], (string) $user->password)) {
+        // Senha atual errada conta no limite por conta do pacote — a ação
+        // Livewire não passa pelo throttle de rota.
+        if (! $passwords->confirmLoginPassword($user, $validated['currentPassword'], 'currentPassword')) {
             throw ValidationException::withMessages([
                 'currentPassword' => __('panel.profile.current_password_invalid'),
             ]);

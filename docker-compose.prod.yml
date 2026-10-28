@@ -139,13 +139,21 @@ services:
       # container — chave gerada na subida é diferente em cada container e não
       # sobrevive ao restart, o que corrompe em silêncio tudo que depende dela.
     volumes:
-      # Compartilha o public/ com o nginx (entrypoint copia na subida).
+      # Compartilha o public/ com o nginx (o entrypoint sincroniza na subida).
       - app_public:/app-public
+    # Pronto = o php-fpm aceitando conexão na 9000 (a porta que o nginx usa).
+    # O nginx só sobe depois: sem o app, ele nem resolve o nome `app`.
+    healthcheck:
+      test: [CMD, php, -r, "exit(@fsockopen('127.0.0.1', 9000) === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       migrate:
         condition: service_completed_successfully
     restart: unless-stopped
@@ -164,8 +172,21 @@ services:
       - app_public:/var/www/html/public:ro
     # Para TLS real, descomentar e apontar para seus certificados:
     #   - ./docker/nginx/certs:/etc/nginx/certs:ro
+    # Os NOMES DO SITE: só eles são atendidos (host desconhecido: 444 / TLS
+    # recusado), e o redirect para HTTPS vai para eles — ver o cabeçalho do
+    # docker/nginx/prod.conf. Sem PROD_SERVER_NAMES (nomes separados por
+    # espaço, ex.: o domínio com e sem www), o host da PROD_APP_URL.
+    environment:
+      APP_URL: ${PROD_APP_URL:-https://localhost}
+      NGINX_SERVER_NAMES: ${PROD_SERVER_NAMES:-}
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, "http://127.0.0.1:8081/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - backend
@@ -210,9 +231,17 @@ services:
   redis:
     image: redis:8.10-alpine
     command: redis-server --appendonly yes --requirepass ${PROD_REDIS_PASSWORD:?defina PROD_REDIS_PASSWORD (sem valor padrao - ver .env.prod.example)}
+    environment:
+      # A senha do redis-cli do healthcheck (sem ela na linha de comando).
+      REDISCLI_AUTH: ${PROD_REDIS_PASSWORD:?defina PROD_REDIS_PASSWORD (sem valor padrao - ver .env.prod.example)}
     volumes:
       - redis_data:/data
     # SEM `ports:` — redis inacessível fora da rede interna (CVEs históricos).
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
     networks:
       - backend
@@ -232,8 +261,10 @@ services:
       <<: *app-env
     command: php artisan horizon
     depends_on:
-      - app
-      - redis
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - backend
@@ -250,7 +281,8 @@ services:
       <<: *app-env
     command: sh -c "while true; do php artisan schedule:run --no-interaction; sleep 60; done"
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - backend

@@ -106,6 +106,18 @@ it('o payload da redação é a saída REAL do Redactor do kit', function () {
         ->and($html)->toContain('472.918.330-15');
 });
 
+it('os segredos da demonstração são obviamente fictícios: nada no formato de uma chave de verdade', function () {
+    $html = $this->get('/v2')->assertOk()->getContent();
+
+    // O formato das chaves de API (do kit e de provedores como o Stripe):
+    // um valor assim no código público dispara os detectores de segredo.
+    expect(preg_match('/\b[a-z]{2}_(live|test|prod)_[0-9a-z]{10,}/i', (string) $html))->toBe(0)
+        // O valor fictício existe (é o "original" que o visitante vê sumir) e
+        // a chave `api_secret` o mascara inteiro.
+        ->and($html)->toContain('sk_demo_segredo_ficticio')
+        ->and(app(Redactor::class)->redactArray(['api_secret' => 'sk_demo_segredo_ficticio']))->toBe(['api_secret' => Redactor::MASK]);
+});
+
 it('a cadeia de ciclo de vida usa os estados reais do enum', function () {
     $html = $this->get('/v2')->assertOk()->getContent();
 
