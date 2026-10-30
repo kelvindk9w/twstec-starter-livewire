@@ -1,0 +1,64 @@
+#!/bin/sh
+# =============================================================================
+# Hook pre-push — ligado SÓ por scripts/instalar-hooks (desligado por padrão).
+#
+# Recusa o push se a ponta de alguma branch ou tag enviada não tiver, no
+# GitHub, o selo `verificacao-local` = success — o que o
+# `scripts/verificar --selo` publica quando a verificação passa no commit
+# exato (ver scripts/lib/selo.sh). Sem o gh (ou sem rede) não há como
+# conferir: o push é recusado, com a instrução. Apagar branch ou tag remota
+# não é conferido (não envia commit), nem a referência técnica que recebe o
+# selo.
+#
+# O `git push --no-verify` pula este hook (é do git, não dá para impedir
+# daqui): para valer de verdade, exija o mesmo status por ruleset no GitHub.
+# =============================================================================
+set -u
+
+RAIZ=$(git rev-parse --show-toplevel)
+# shellcheck source=SCRIPTDIR/../lib/selo.sh
+. "$RAIZ/scripts/lib/selo.sh"
+
+ZERO=0000000000000000000000000000000000000000
+CONTEXTO=$(selo_contexto)
+
+if ! REPO=$(selo_repo); then
+    selo_erro 'push recusado: o remoto origin não é um repositório do GitHub (ou defina VERIFICACAO_REPO); não há como conferir o selo.'
+    exit 1
+fi
+if ! selo_gh_pronto; then
+    selo_erro "push recusado: o gh não está instalado ou está sem login, e o selo '$CONTEXTO' é conferido por ele. Rode 'gh auth login'."
+    exit 1
+fi
+
+RECUSOU=0
+while read -r local_ref local_sha remote_ref _remote_sha; do
+    [ -n "${local_sha:-}" ] || continue
+    [ "$local_sha" = "$ZERO" ] && continue
+    case "$remote_ref" in "$SELO_REF_TECNICA"/*) continue ;; esac
+    if ! COMMIT=$(git rev-parse --verify --quiet "$local_sha^{commit}"); then
+        selo_erro "push recusado: $remote_ref não aponta para um commit."
+        RECUSOU=1
+        continue
+    fi
+    CURTO=$(selo_curto "$COMMIT")
+    if ! LINHA=$(selo_do_github "$REPO" "$COMMIT"); then
+        selo_erro "push recusado: não consegui consultar o selo de $CURTO no GitHub (sem rede? sem acesso?). Confira 'gh auth status' e repita."
+        RECUSOU=1
+        continue
+    fi
+    ESTADO=$(selo_campo "$LINHA" 1)
+    if [ "$ESTADO" != success ]; then
+        selo_erro "push recusado: o commit $CURTO (→ ${remote_ref#refs/heads/}) não tem o selo '$CONTEXTO' = success (está: $ESTADO)."
+        {
+            echo "  Com esse commit no HEAD e a árvore limpa, rode:  scripts/verificar --selo"
+            echo "  e repita o push."
+            if [ "$local_ref" != HEAD ] && [ "$(git rev-parse HEAD)" != "$COMMIT" ]; then
+                echo "  Atenção: o commit enviado ($CURTO) não é o HEAD atual ($(git rev-parse --short HEAD))."
+            fi
+        } >&2
+        RECUSOU=1
+    fi
+done
+
+exit "$RECUSOU"

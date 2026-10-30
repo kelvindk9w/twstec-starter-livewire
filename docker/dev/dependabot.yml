@@ -1,0 +1,93 @@
+# =============================================================================
+# Dependabot do projeto — atualizações de dependências uma vez por semana,
+# agrupadas, em pull requests contra a branch padrão do repositório.
+#
+# O QUE ACOMPANHA: Composer e npm (raiz do projeto), as ações do GitHub
+# Actions (.github/workflows — fixadas por commit: o Dependabot troca o SHA e
+# o comentário da versão juntos), as imagens base dos Dockerfiles
+# (docker/php e docker/nginx) e as imagens dos arquivos compose da raiz
+# (compose.yaml do desenvolvimento e docker-compose.prod.yml).
+#
+# OS PACOTES DO KIT (`twstec/*`) andam juntos — a mesma versão em todos — e
+# pedem a leitura do CHANGELOG do kit antes do merge (a correção em arquivo
+# do projeto não chega pelo Composer): grupo próprio, nunca misturado com o
+# resto. Um grupo pega a dependência que casar primeiro (a ordem importa).
+#
+# OS PRs NÃO DISPARAM O CI se o workflow não tiver gatilho de pull_request
+# (o CI base roda à mão e uma vez por semana): baixe a branch do PR e rode
+# `scripts/verificar` antes do merge — ou acrescente o gatilho no CI.
+#
+# Outra branch de destino (em vez da padrão): `target-branch: <branch>` em
+# cada entrada (aí os grupos e o limite valem só para as atualizações de
+# versão; as de segurança continuam na branch padrão, uma por PR).
+# =============================================================================
+version: 2
+updates:
+    - package-ecosystem: composer
+      directory: /
+      schedule:
+          interval: weekly
+          day: monday
+      open-pull-requests-limit: 5
+      groups:
+          twstec:
+              patterns: ['twstec/*']
+          framework:
+              dependency-type: production
+              patterns:
+                  [
+                      'laravel/*',
+                      'livewire/*',
+                      'filament/*',
+                      'inertiajs/*',
+                      'spatie/*',
+                  ]
+          dev:
+              dependency-type: development
+
+    - package-ecosystem: npm
+      directory: /
+      schedule:
+          interval: weekly
+          day: monday
+      open-pull-requests-limit: 5
+      groups:
+          producao:
+              dependency-type: production
+          dev:
+              dependency-type: development
+
+    - package-ecosystem: github-actions
+      directory: /
+      schedule:
+          interval: weekly
+          day: monday
+      open-pull-requests-limit: 3
+      groups:
+          actions:
+              patterns: ['*']
+
+    - package-ecosystem: docker
+      directories: ['/docker/php', '/docker/nginx']
+      schedule:
+          interval: weekly
+          day: monday
+      open-pull-requests-limit: 3
+      groups:
+          imagens:
+              patterns: ['*']
+
+    # A versão MAJOR do PostgreSQL não sobe sozinha: trocar exige migrar os
+    # dados (pg_upgrade ou dump e restauração), não só a imagem.
+    - package-ecosystem: docker-compose
+      directory: /
+      schedule:
+          interval: weekly
+          day: monday
+      open-pull-requests-limit: 3
+      ignore:
+          - dependency-name: postgres
+            update-types: ['version-update:semver-major']
+      groups:
+          compose:
+              patterns: ['*']

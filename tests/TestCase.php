@@ -5,8 +5,10 @@ namespace Tests;
 use App\Providers\Filament\AdminPanelProvider;
 use Composer\InstalledVersions;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\DB;
 use PDO;
 use RuntimeException;
+use Twstec\Kit\Foundation\Database\DatabaseRoles;
 use Twstec\Kit\Foundation\Kit;
 
 abstract class TestCase extends BaseTestCase
@@ -113,10 +115,37 @@ abstract class TestCase extends BaseTestCase
         }
 
         if ($driver === 'pgsql') {
+            self::runAsMigrationRole($connection);
             self::lockSuiteDatabase((array) config("database.connections.{$connection}"));
         }
 
         return parent::setUpTraits();
+    }
+
+    /**
+     * SEPARAÇÃO DE PAPÉIS (DB_MIGRATION_USERNAME diferente do DB_USERNAME —
+     * o Docker de desenvolvimento): a suíte roda com o papel de MIGRAÇÃO, o
+     * dono do banco de teste, e não com o da aplicação. A suíte recria o
+     * esquema a cada execução e há testes que, de propósito, criam tabelas
+     * e instalam ou tiram gatilhos (contas, contas demo, trilhas) — coisa
+     * que o papel da aplicação não pode fazer. A separação em si é provada
+     * pelos testes que conectam com um papel de aplicação de verdade
+     * (tests/Feature/Database/DatabaseRolesTest.php).
+     */
+    private static function runAsMigrationRole(string $connection): void
+    {
+        $roles = app(DatabaseRoles::class);
+
+        if (! $roles->separated()) {
+            return;
+        }
+
+        config([
+            "database.connections.{$connection}.username" => $roles->migrationUsername(),
+            "database.connections.{$connection}.password" => (string) config('database_roles.migration.password', ''),
+        ]);
+
+        DB::purge($connection);
     }
 
     /**

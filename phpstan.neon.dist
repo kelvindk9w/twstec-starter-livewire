@@ -1,5 +1,6 @@
 # ANÁLISE ESTÁTICA (Larastan — PHPStan com as regras do Laravel), nível 8, no
-# código do aplicativo (app/). Roda no CI do kit e no projeto criado:
+# código do aplicativo (app/, bootstrap/, config/, database/ e routes/). Roda
+# no CI do kit e no projeto criado:
 #
 #     ./vendor/bin/phpstan analyse
 #
@@ -8,7 +9,9 @@
 #
 # Projeto sem algum módulo opcional: o phpstan.modules.php tira da análise as
 # telas do módulo ausente (que continuam no app/ para o `tws:add`) — com todos
-# os módulos, não tira nada.
+# os módulos, não tira nada. Ele também inclui o extension.neon de cada pacote
+# do kit instalado: as colunas e os casts dos models do kit (migrations no
+# vendor/) ficam visíveis sem listar nada à mão.
 includes:
     - vendor/larastan/larastan/extension.neon
     - vendor/nesbot/carbon/extension.neon
@@ -17,7 +20,21 @@ includes:
 parameters:
     paths:
         - app/
+        - bootstrap/
+        - config/
+        - database/
+        - routes/
+    excludePaths:
+        analyse:
+            # Gerado pelo framework (lista de pacotes e provedores em cache).
+            - bootstrap/cache (?)
     level: 8
+
+    # As migrations do PROJETO. As dos pacotes do kit entram pelas extensões
+    # deles (phpstan.modules.php); com elas, o Larastan não lê mais sozinho o
+    # database/migrations — por isso ele fica listado aqui.
+    databaseMigrationsPath:
+        - database/migrations
 
     ignoreErrors:
         # As peças NEUTRAS dos módulos opcionais (sem o /admin, sem a foto de

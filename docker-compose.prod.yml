@@ -35,6 +35,17 @@
 # com código 78 quando ela falta em produção — ver docker/php/entrypoint-prod.sh
 # e Twstec\Kit\Foundation\Support\CriticalSecrets.
 #
+# DOIS PAPÉIS NO POSTGRESQL (ver docs/producao.md, "Papéis do PostgreSQL"):
+#   - PROD_POSTGRES_USER / PROD_POSTGRES_PASSWORD: o superusuário do container
+#     e dono do banco — o papel de MIGRAÇÃO. Só o migrate e o scheduler o
+#     recebem.
+#   - PROD_DB_APP_USERNAME / PROD_DB_APP_PASSWORD: o papel da APLICAÇÃO (app,
+#     horizon, scheduler). Sem superusuário, sem posse, só SELECT/INSERT nas
+#     trilhas só-acréscimo — não desliga gatilho nem apaga a trilha. O
+#     migrate o cria na primeira subida (e reafirma a senha a cada deploy).
+#   O migrate termina com `php artisan db:check-roles`: se o papel da
+#   aplicação puder desfazer a proteção, a subida para ali.
+#
 # ATENÇÃO: o Compose SEMPRE usa o .env da raiz para interpolar ${VAR} — por
 # isso aqui só existem nomes PROD_* (nunca presentes no .env de dev).
 # =============================================================================
@@ -103,8 +114,11 @@ x-app-env: &app-env
   DB_HOST: postgres
   DB_PORT: 5432
   DB_DATABASE: ${PROD_POSTGRES_DB:-tws_starter}
-  DB_USERNAME: ${PROD_POSTGRES_USER:-tws}
-  DB_PASSWORD: ${PROD_POSTGRES_PASSWORD:?defina PROD_POSTGRES_PASSWORD (sem valor padrao - ver .env.prod.example)}
+  # O papel da APLICAÇÃO (ver o cabeçalho, "DOIS PAPÉIS"): não é o
+  # PROD_POSTGRES_USER, que é o dono do banco e só entra no migrate e no
+  # scheduler (x-migration-env).
+  DB_USERNAME: ${PROD_DB_APP_USERNAME:-tws_app}
+  DB_PASSWORD: ${PROD_DB_APP_PASSWORD:?defina PROD_DB_APP_PASSWORD (sem valor padrao - ver .env.prod.example)}
   CACHE_STORE: redis
   SESSION_DRIVER: redis
   QUEUE_CONNECTION: redis
@@ -121,6 +135,14 @@ x-app-env: &app-env
   MAIL_HOST: ${PROD_MAIL_HOST:-}
   MAIL_PORT: ${PROD_MAIL_PORT:-2525}
   MAIL_FROM_ADDRESS: ${PROD_MAIL_FROM_ADDRESS:-no-reply@example.com}
+
+# O papel de MIGRAÇÃO (o PROD_POSTGRES_USER, dono do banco): só no migrate (as
+# migrations e o acerto dos privilégios do papel da aplicação) e no scheduler
+# (as podas das trilhas só-acréscimo, audit:prune e outbound-http:prune, que
+# apagam onde o papel da aplicação não pode). O app e o horizon NÃO o recebem.
+x-migration-env: &migration-env
+  DB_MIGRATION_USERNAME: ${PROD_POSTGRES_USER:-tws}
+  DB_MIGRATION_PASSWORD: ${PROD_POSTGRES_PASSWORD:?defina PROD_POSTGRES_PASSWORD (sem valor padrao - ver .env.prod.example)}
 
 services:
   app:
@@ -200,8 +222,12 @@ services:
       - path: .env.prod
         required: false
     environment:
-      <<: *app-env
-    command: php artisan migrate --force --no-interaction
+      <<: [*app-env, *migration-env]
+    # As migrations com o papel de migração (o kit desvia o `migrate` para ele
+    # e, no fim, cria ou acerta o papel da aplicação); depois, a conferência
+    # com o papel da aplicação — dono do esquema ou privilégio proibido nas
+    # trilhas = o migrate falha e o app não sobe.
+    command: sh -c "php artisan migrate --force --no-interaction && php artisan db:check-roles"
     depends_on:
       postgres:
         condition: service_healthy
@@ -278,7 +304,7 @@ services:
       - path: .env.prod
         required: false
     environment:
-      <<: *app-env
+      <<: [*app-env, *migration-env]
     command: sh -c "while true; do php artisan schedule:run --no-interaction; sleep 60; done"
     depends_on:
       app:

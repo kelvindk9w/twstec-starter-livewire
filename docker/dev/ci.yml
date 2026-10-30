@@ -20,11 +20,23 @@
 #
 # O banco da suíte é o que o phpunit.pgsql.xml força (<banco>_test): o passo
 # "Banco de teste" o lê de lá e o cria no PostgreSQL do job.
+#
+# E2E (opcional, só no disparo manual — marque "Rodar também o E2E"): o job
+# `e2e` sobe o Docker de desenvolvimento do projeto (compose.yaml) numa
+# máquina limpa, com um .env EFÊMERO gerado no próprio job (o nome e as
+# portas tirados da APP_URL do .env.example; senhas e chaves aleatórias,
+# descartadas no fim) — nenhum segredo do repositório — e roda o
+# `scripts/e2e`, o mesmo da máquina (`scripts/verificar --e2e`).
 # =============================================================================
 name: CI
 
 on:
   workflow_dispatch:
+    inputs:
+      e2e:
+        description: 'Rodar também o E2E (Playwright) no Docker de desenvolvimento'
+        type: boolean
+        default: false
   schedule:
     - cron: '0 6 * * 1'
 
@@ -57,12 +69,16 @@ jobs:
           --health-retries 10
 
     # Variáveis do processo vencem o .env; o nome do banco vem forçado pelo
-    # phpunit.pgsql.xml.
+    # phpunit.pgsql.xml. O papel de migração é o mesmo usuário do serviço
+    # (dono do banco de teste): a suíte roda com ele, e os testes da
+    # separação de papéis criam o papel de aplicação deles.
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: 5432
       DB_USERNAME: ci
       DB_PASSWORD: ci
+      DB_MIGRATION_USERNAME: ci
+      DB_MIGRATION_PASSWORD: ci
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -116,3 +132,59 @@ jobs:
 
       - name: Testes (Pest · PostgreSQL 18)
         run: ./vendor/bin/pest --ci -c phpunit.pgsql.xml
+
+  e2e:
+    name: E2E (Playwright · Docker de desenvolvimento)
+    if: github.event_name == 'workflow_dispatch' && inputs.e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # O .env do Docker de desenvolvimento, como o instalador grava na
+      # criação: o nome e a porta do site vêm da APP_URL do .env.example
+      # (http://<nome>.localhost:<porta>), as outras portas seguem a do site
+      # (808N → e-mails 802N, Vite 803N, banco 804N), o dono dos arquivos é o
+      # usuário do job, e as senhas e chaves são geradas aqui, só para este
+      # job.
+      - name: .env efêmero
+        run: |
+          cp .env.example .env
+          url=$(sed -n 's/^APP_URL=//p' .env.example | tail -n 1)
+          name=$(printf '%s' "$url" | sed -n 's|^http://\([a-z0-9-]*\)\.localhost:[0-9]*$|\1|p')
+          port=${url##*:}
+          if [ -z "$name" ]; then echo "APP_URL do .env.example fora do padrão http://<nome>.localhost:<porta>: $url"; exit 1; fi
+          set_env() {
+            if grep -q "^$1=" .env; then
+              awk -v key="$1" -v value="$2" 'index($0, key "=") == 1 { print key "=" value; next } { print }' .env > .env.tmp
+              mv .env.tmp .env
+            else
+              printf '%s=%s\n' "$1" "$2" >> .env
+            fi
+          }
+          set_env COMPOSE_PROJECT_NAME "$name"
+          set_env COMPOSE_PROFILES ''
+          set_env DEV_SITE_PORT "$port"
+          set_env DEV_MAIL_PORT "$((port - 60))"
+          set_env DEV_VITE_PORT "$((port - 50))"
+          set_env DEV_DB_PORT "$((port - 40))"
+          set_env DEV_UID "$(id -u)"
+          set_env DEV_GID "$(id -g)"
+          set_env APP_KEY "base64:$(openssl rand -base64 32)"
+          set_env DB_PASSWORD "$(openssl rand -hex 16)"
+          set_env DB_MIGRATION_PASSWORD "$(openssl rand -hex 16)"
+          set_env REDIS_PASSWORD "$(openssl rand -hex 16)"
+          set_env API_KEYS_HASH_PEPPER "$(openssl rand -hex 32)"
+          set_env UPLOADS_ENCRYPTION_KEY "base64:$(openssl rand -base64 32)"
+          set_env RATE_LIMIT_SENSITIVE 30
+          echo "projeto $name: http://$name.localhost:$port"
+
+      - name: E2E (scripts/e2e)
+        run: scripts/e2e
+
+      - name: Logs do ambiente (se falhar)
+        if: failure()
+        run: docker compose logs --tail=200

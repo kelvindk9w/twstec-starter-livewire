@@ -20,10 +20,29 @@
 # Para no primeiro passo que falhar, com o código de saída dele. Sobe só o
 # banco (e o db-init) se ainda não estiverem no ar; os containers dos passos
 # são descartáveis (`run --rm`). As auditorias consultam a internet.
+#
+# Opções (o modelo de VERIFICAÇÃO LOCAL COM SELO — opcional, desligado por
+# padrão; ver scripts/lib/selo.sh e scripts/instalar-hooks):
+#   --e2e    roda também a suíte E2E (scripts/e2e), com o projeto no ar
+#   --selo   no commit pronto (árvore limpa): se tudo passar, publica no
+#            GitHub o status `verificacao-local` = success no SHA exato (sem
+#            gastar minutos do Actions) — o que o hook pre-push e o
+#            scripts/promover exigem. Precisa de git e do gh com login.
 # =============================================================================
 set -eu
 
 cd "$(dirname "$0")/.."
+
+E2E=0
+SELO=0
+for opcao in "$@"; do
+    case "$opcao" in
+        --e2e) E2E=1 ;;
+        --selo) SELO=1 ;;
+        -h|--ajuda|--help) sed -n '2,/^# ====/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "scripts/verificar: opção desconhecida: $opcao (veja scripts/verificar --ajuda)" >&2; exit 2 ;;
+    esac
+done
 
 if [ ! -f compose.yaml ] || [ ! -f .env ]; then
     echo "scripts/verificar: rode num projeto com o Docker de desenvolvimento (compose.yaml e .env na raiz — o instalador os cria)." >&2
@@ -33,6 +52,17 @@ fi
 passo() {
     printf '\n==> %s\n' "$1"
 }
+
+# O selo vale para o commit exato: árvore limpa antes e depois, o mesmo HEAD.
+if [ "$SELO" = 1 ]; then
+    # shellcheck source=SCRIPTDIR/lib/selo.sh
+    . scripts/lib/selo.sh
+    selo_arvore_limpa || { selo_erro 'árvore suja: o selo vale só para o commit exato (HEAD). Faça commit (ou descarte as mudanças) e rode de novo.'; exit 2; }
+    selo_repo >/dev/null || { selo_erro 'o remoto origin não é um repositório do GitHub (ou defina VERIFICACAO_REPO).'; exit 2; }
+    selo_gh_pronto || { selo_erro "gh ausente ou sem login: rode 'gh auth login'."; exit 2; }
+    VERIFICADO=$(git rev-parse HEAD)
+    INICIO=$(date +%s)
+fi
 
 passo 'Estilo (Pint)'
 docker compose run --rm --no-deps -T app ./vendor/bin/pint --test
@@ -54,4 +84,18 @@ docker compose up -d --wait postgres
 docker compose run --rm -T db-init
 docker compose run --rm --no-deps -T app ./vendor/bin/pest --ci -c phpunit.pgsql.xml
 
+if [ "$E2E" = 1 ]; then
+    passo 'E2E (scripts/e2e)'
+    scripts/e2e
+fi
+
 printf '\nscripts/verificar: tudo certo.\n'
+
+if [ "$SELO" = 1 ]; then
+    passo 'Selo no commit verificado'
+    [ "$(git rev-parse HEAD)" = "$VERIFICADO" ] || { selo_erro 'o HEAD mudou durante a verificação: nada publicado.'; exit 1; }
+    selo_arvore_limpa || { selo_erro 'a árvore ficou suja durante a verificação (algum passo mudou arquivo versionado): nada publicado.'; git status --short | head -n 20 >&2; exit 1; }
+    SEGUNDOS=$(($(date +%s) - INICIO))
+    if [ "$E2E" = 1 ]; then COM_E2E=sim; else COM_E2E=não; fi
+    selo_publicar "$VERIFICADO" "$(printf 'OK em %dm%02ds · %s · pint larastan audits build pest' $((SEGUNDOS / 60)) $((SEGUNDOS % 60)) "E2E: $COM_E2E")"
+fi

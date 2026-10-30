@@ -7,6 +7,7 @@ namespace App\Livewire\Account;
 use App\Livewire\Concerns\ConfirmsSensitiveAction;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -301,7 +302,7 @@ final class Show extends Component
      * Membros da conta atual, com o papel e o que QUEM ESTÁ VENDO pode fazer
      * com cada um (a mesma regra que a Action aplica).
      *
-     * @return Collection<int, array{uuid: string, name: string, email: string, role: AccountRole, self: bool, user: User, canPromote: bool, canDemote: bool, canRemove: bool, joined: mixed}>
+     * @return Collection<int, array{uuid: string, name: string, email: string, role: AccountRole, self: bool, user: User, canPromote: bool, canDemote: bool, canRemove: bool, joined: Carbon|null}>
      */
     private function members(Account $account, ?AccountRole $papel): Collection
     {
@@ -312,8 +313,7 @@ final class Show extends Component
         return $this->directory()->members($account)
             ->ensure(User::class)
             ->map(function (User $pessoa) use ($papel): array {
-                $vinculo = $pessoa->getRelation('pivot');
-                $role = AccountRole::from((string) $vinculo->getAttribute('role'));
+                $role = $this->directory()->roleOf($pessoa);
                 $self = $pessoa->is($this->user());
 
                 return [
@@ -326,7 +326,7 @@ final class Show extends Component
                     'canPromote' => MemberRules::canChangeRole($papel, $role, AccountRole::Admin, $self),
                     'canDemote' => MemberRules::canChangeRole($papel, $role, AccountRole::Member, $self),
                     'canRemove' => MemberRules::canRemove($papel, $role, $self),
-                    'joined' => $vinculo->getAttribute('created_at'),
+                    'joined' => $this->directory()->memberSince($pessoa),
                 ];
             })
             ->sortBy(fn (array $m): string => $ordem[$m['role']->value].mb_strtolower($m['name']))

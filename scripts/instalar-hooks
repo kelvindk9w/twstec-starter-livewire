@@ -1,0 +1,54 @@
+#!/bin/sh
+# =============================================================================
+# scripts/instalar-hooks — LIGA, neste clone, o modelo de verificação local
+# com selo (opcional; desligado por padrão — ver scripts/lib/selo.sh).
+#
+# Aponta o `core.hooksPath` do git para scripts/hooks (versionados): o
+# pre-push passa a recusar enviar commit sem o selo `verificacao-local` do
+# `scripts/verificar --selo`. Idempotente. Os hooks acompanham o repositório
+# (atualizou a branch, atualizou o hook).
+#
+#   scripts/instalar-hooks              liga
+#   scripts/instalar-hooks --desligar   desliga (volta ao .git/hooks)
+#
+# Com o core.hooksPath, os hooks de .git/hooks deixam de rodar (o script
+# avisa quais são).
+# =============================================================================
+set -eu
+
+RAIZ=$(git rev-parse --show-toplevel)
+cd "$RAIZ"
+
+ATUAL=$(git config --local --get core.hooksPath || true)
+
+case "${1:-}" in
+    --desligar)
+        if [ "$ATUAL" = scripts/hooks ]; then
+            git config --local --unset core.hooksPath
+            echo 'Hooks desligados (core.hooksPath removido).'
+        else
+            echo "Nada a desligar (core.hooksPath: ${ATUAL:-não definido})."
+        fi
+        exit 0 ;;
+    '') ;;
+    -h|--ajuda|--help) sed -n '2,/^# ====/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "scripts/instalar-hooks: opção desconhecida: $1" >&2; exit 2 ;;
+esac
+
+chmod +x scripts/hooks/pre-push scripts/verificar scripts/promover scripts/e2e scripts/instalar-hooks
+
+if [ "$ATUAL" = scripts/hooks ]; then
+    echo 'Hooks já instalados (core.hooksPath = scripts/hooks).'
+else
+    if [ -n "$ATUAL" ]; then echo "core.hooksPath era '$ATUAL'; passa a ser scripts/hooks."; fi
+    git config --local core.hooksPath scripts/hooks
+    echo 'Hooks instalados (core.hooksPath = scripts/hooks).'
+fi
+
+ANTIGOS=$(find "$(git rev-parse --git-common-dir)/hooks" -maxdepth 1 -type f ! -name '*.sample' 2>/dev/null | sed 's|.*/||' | tr '\n' ' ')
+if [ -n "$ANTIGOS" ]; then echo "Aviso: estes hooks de .git/hooks não rodam mais: $ANTIGOS"; fi
+
+for programa in docker gh; do
+    command -v "$programa" >/dev/null 2>&1 || echo "Aviso: '$programa' não encontrado — o pre-push recusa o push sem ele."
+done
+echo '  pre-push: exige o selo verificacao-local (rode scripts/verificar --selo antes do push)'

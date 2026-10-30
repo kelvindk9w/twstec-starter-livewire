@@ -1,0 +1,114 @@
+#!/bin/sh
+# =============================================================================
+# scripts/e2e — a suíte E2E (Playwright) contra o Docker de desenvolvimento
+# DESTE projeto, só com o Docker na máquina (sem PHP nem Node instalados).
+#
+#   1. sobe o projeto (`docker compose up -d`) e espera o site (/up) e o Vite
+#      responderem — no endereço do .env (APP_URL, DEV_SITE_PORT,
+#      DEV_VITE_PORT);
+#   2. espera o limite de borda entre duas rodadas (60 s desde a última, na
+#      mesma máquina);
+#   3. cria (ou devolve ao estado inicial) as pessoas fixas do E2E
+#      (tests/e2e/fixtures.php);
+#   4. roda o Playwright na imagem oficial da MESMA versão do package-lock.json
+#      (rede do host: o site e o Mailpit estão em 127.0.0.1);
+#   5. confere que não sobrou nada: nenhuma pessoa `e2e-…` no banco e nenhuma
+#      mensagem para `e2e-…` no Mailpit.
+#
+# Uso, na raiz do projeto:   scripts/e2e [argumentos do playwright test]
+# É o que roda o `scripts/verificar --e2e` e o job de E2E do CI
+# (.github/workflows/ci.yml, disparo manual). Para no primeiro passo que
+# falhar, com o código de saída dele.
+# =============================================================================
+set -eu
+
+cd "$(dirname "$0")/.."
+
+if [ ! -f compose.yaml ] || [ ! -f .env ]; then
+    echo "scripts/e2e: rode num projeto com o Docker de desenvolvimento (compose.yaml e .env na raiz — o instalador os cria)." >&2
+    exit 2
+fi
+
+passo() {
+    printf '\n==> %s\n' "$1"
+}
+
+# Uma chave do .env (a última linha dela), sem aspas.
+env_valor() {
+    sed -n "s/^$1=//p" .env | tail -n 1 | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'$/\1/"
+}
+
+# Espera uma URL responder 200 ($2 tentativas, de 5 em 5 s); $3, opcional: o
+# cabeçalho Host (o site só atende pelo nome do projeto).
+esperar() {
+    tentativas=$2
+    codigo=
+    while [ "$tentativas" -gt 0 ]; do
+        if [ -n "${3:-}" ]; then
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' -H "Host: $3" "$1" || true)
+        else
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' "$1" || true)
+        fi
+        [ "$codigo" = 200 ] && return 0
+        tentativas=$((tentativas - 1))
+        sleep 5
+    done
+    echo "não respondeu: $1 — último código: ${codigo:-nenhum}" >&2
+    docker compose ps -a >&2
+    return 1
+}
+
+NOME=$(env_valor COMPOSE_PROJECT_NAME)
+SITE=$(env_valor DEV_SITE_PORT)
+VITE=$(env_valor DEV_VITE_PORT)
+for chave in COMPOSE_PROJECT_NAME DEV_SITE_PORT DEV_VITE_PORT DEV_MAIL_PORT APP_URL; do
+    if [ -z "$(env_valor "$chave")" ]; then
+        echo "scripts/e2e: falta $chave no .env (o instalador grava)." >&2
+        exit 2
+    fi
+done
+U="$(id -u):$(id -g)"
+
+passo 'Projeto no ar (site e Vite)'
+docker compose up -d
+esperar "http://127.0.0.1:$SITE/up" 120 "$NOME.localhost:$SITE"
+esperar "http://127.0.0.1:$VITE/@vite/client" 60
+echo "site: http://$NOME.localhost:$SITE"
+
+# O limite de borda (por IP) entre duas rodadas: a marca fica dentro do .git
+# (fora da árvore, nunca versionada); fora de um repositório git, não espera.
+MARCA=
+if pasta_git=$(git rev-parse --git-common-dir 2>/dev/null); then
+    MARCA="$pasta_git/e2e-ultima-rodada"
+fi
+if [ -n "$MARCA" ] && [ -f "$MARCA" ]; then
+    espera=$((61 - ($(date +%s) - $(cat "$MARCA"))))
+    if [ "$espera" -gt 0 ]; then
+        passo "Esperando $espera s (limite de borda entre duas rodadas do E2E)"
+        sleep "$espera"
+    fi
+fi
+
+passo 'Pessoas fixas do E2E'
+docker compose exec -T app php artisan tinker --execute="require 'tests/e2e/fixtures.php';"
+
+passo 'Playwright'
+VERSAO=$(docker compose run --rm --no-deps -T vite node -p 'require("./package-lock.json").packages["node_modules/@playwright/test"].version')
+echo "Playwright $VERSAO"
+rc=0
+docker run --rm --network host --user "$U" -e HOME=/tmp -e CI="${CI:-}" \
+    -v "$(pwd)":/work -w /work "mcr.microsoft.com/playwright:v$VERSAO-noble" \
+    npx playwright test "$@" || rc=$?
+if [ -n "$MARCA" ]; then date +%s >"$MARCA"; fi
+[ "$rc" = 0 ] || exit "$rc"
+
+passo 'Sobras (pessoas e mensagens e2e-…)'
+PESSOAS=$(docker compose exec -T app php artisan tinker \
+    --execute='echo \App\Models\User::where("email", "like", "e2e-%")->count();' | tr -dc '0-9')
+MENSAGENS=$(docker compose exec -T app php -r '
+    $resposta = file_get_contents("http://mailpit:8025/api/v1/search?query=to:e2e-");
+    echo $resposta === false ? "" : json_decode($resposta, true)["messages_count"];')
+echo "pessoas e2e-…: ${PESSOAS:-?}; mensagens e2e-… no Mailpit: ${MENSAGENS:-?}"
+[ "$PESSOAS" = 0 ] && [ "$MENSAGENS" = 0 ]
+
+printf '\nscripts/e2e: tudo certo.\n'

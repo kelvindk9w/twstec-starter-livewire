@@ -1,0 +1,151 @@
+#!/bin/sh
+# =============================================================================
+# scripts/promover — leva um commit JÁ VERIFICADO para a branch seguinte da
+# cadeia, só por fast-forward (parte do modelo opcional de verificação local
+# com selo — ver scripts/lib/selo.sh).
+#
+#   scripts/promover <destino> [--sha <sha>] [--sim]
+#
+# A cadeia vem de VERIFICACAO_BRANCHES (padrão "desenvolvimento sandbox
+# producao"): `scripts/promover sandbox` leva desenvolvimento → sandbox. O
+# commit promovido é a ponta da branch de origem NO GITHUB (depois de um
+# fetch), ou o de --sha (que precisa estar na origem). Recusa se:
+#   - a árvore local estiver suja;
+#   - o destino não for ancestral do commit (não seria fast-forward);
+#   - o commit não tiver o selo `verificacao-local` = success;
+#   - o autor do selo não estiver em VERIFICACAO_PUBLICADORES (se definida);
+#   - o destino estiver em VERIFICACAO_E2E_BRANCHES (padrão: a última da
+#     cadeia) e o selo não disser que o E2E rodou.
+# Envia com `git push origin <sha>:refs/heads/<destino>` — nunca force-push —
+# e confere no GitHub. O hook pre-push (se ligado) e o ruleset do destino
+# conferem de novo.
+#
+# Opções: --sha <sha>  promove esse commit em vez da ponta da origem
+#         --sim        não pergunta antes de enviar
+# =============================================================================
+set -eu
+
+RAIZ=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    echo 'scripts/promover: rode dentro do repositório do projeto.' >&2
+    exit 2
+}
+cd "$RAIZ"
+# shellcheck source=SCRIPTDIR/lib/selo.sh
+. "$RAIZ/scripts/lib/selo.sh"
+
+uso() { sed -n '2,/^# ====/p' "$0" | sed 's/^# \{0,1\}//'; }
+
+DESTINO=
+SHA_PEDIDO=
+SEM_PERGUNTA=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --sha) SHA_PEDIDO=${2:-}; shift ;;
+        --sim) SEM_PERGUNTA=1 ;;
+        -h|--ajuda|--help) uso; exit 0 ;;
+        -*) selo_erro "opção desconhecida: $1"; uso >&2; exit 2 ;;
+        *) DESTINO=$1 ;;
+    esac
+    shift
+done
+[ -n "$DESTINO" ] || { uso >&2; exit 2; }
+
+recusar() {
+    selo_erro "promoção recusada: $1"
+    shift
+    for linha in "$@"; do echo "  $linha" >&2; done
+    exit 1
+}
+
+# A origem é a branch anterior ao destino na cadeia.
+ORIGEM=
+ANTERIOR=
+for branch in $(selo_branches); do
+    if [ "$branch" = "$DESTINO" ]; then ORIGEM=$ANTERIOR; break; fi
+    ANTERIOR=$branch
+done
+[ -n "$ORIGEM" ] || recusar "'$DESTINO' não é uma branch de destino da cadeia ($(selo_branches))." \
+    'A cadeia vem de VERIFICACAO_BRANCHES (ambiente ou .env); a primeira branch não recebe promoção.'
+EXIGE_E2E=0
+for branch in $(selo_branches_e2e); do
+    [ "$branch" = "$DESTINO" ] && EXIGE_E2E=1
+done
+CONTEXTO=$(selo_contexto)
+
+# 1) Árvore limpa.
+selo_arvore_limpa || recusar 'a árvore local está suja.' 'Faça commit ou descarte as mudanças antes de promover (git status).'
+selo_gh_pronto || recusar "o gh não está instalado ou está sem login (gh auth login)."
+REPO=$(selo_repo) || recusar 'o remoto origin não é um repositório do GitHub (ou defina VERIFICACAO_REPO).'
+
+# 2) O estado atual do GitHub.
+git fetch --quiet origin \
+    "+refs/heads/$ORIGEM:refs/remotes/origin/$ORIGEM" \
+    "+refs/heads/$DESTINO:refs/remotes/origin/$DESTINO" \
+    || recusar "não consegui ler $ORIGEM e $DESTINO do GitHub (git fetch). As duas branches existem lá?"
+PONTA_ORIGEM=$(git rev-parse "refs/remotes/origin/$ORIGEM")
+PONTA_DESTINO=$(git rev-parse "refs/remotes/origin/$DESTINO")
+
+if [ -n "$SHA_PEDIDO" ]; then
+    COMMIT=$(git rev-parse --verify --quiet "$SHA_PEDIDO^{commit}") || recusar "--sha $SHA_PEDIDO não é um commit conhecido."
+    git merge-base --is-ancestor "$COMMIT" "$PONTA_ORIGEM" \
+        || recusar "$(selo_curto "$COMMIT") não está em $ORIGEM no GitHub: só se promove o que já passou pela origem."
+else
+    COMMIT=$PONTA_ORIGEM
+fi
+CURTO=$(selo_curto "$COMMIT")
+
+if [ "$COMMIT" = "$PONTA_DESTINO" ]; then
+    echo "$DESTINO já está em $CURTO: nada a promover."
+    exit 0
+fi
+
+# 3) Fast-forward.
+git merge-base --is-ancestor "$PONTA_DESTINO" "$COMMIT" \
+    || recusar "$DESTINO ($(selo_curto "$PONTA_DESTINO")) não é ancestral de $CURTO: não seria fast-forward." \
+        "$DESTINO tem commits que $ORIGEM não tem — investigue (git log origin/$ORIGEM..origin/$DESTINO)." \
+        'Este script nunca força o push.'
+
+# 4) O selo do commit exato.
+if [ "$EXIGE_E2E" = 1 ]; then COMANDO='scripts/verificar --selo --e2e'; else COMANDO='scripts/verificar --selo'; fi
+LINHA=$(selo_do_github "$REPO" "$COMMIT") || recusar "não consegui consultar o selo de $CURTO no GitHub (sem rede?)."
+ESTADO=$(selo_campo "$LINHA" 1)
+AUTOR=$(selo_campo "$LINHA" 2)
+DESCRICAO=$(selo_campo "$LINHA" 3)
+[ "$ESTADO" = success ] || recusar "$CURTO não tem o selo '$CONTEXTO' = success (está: $ESTADO)." \
+    "Verifique esse commit: git switch --detach $CURTO && $COMANDO   (depois: git switch -)"
+PUBLICADORES=$(selo_config VERIFICACAO_PUBLICADORES '')
+if [ -n "$PUBLICADORES" ]; then
+    case " $PUBLICADORES " in
+        *" $AUTOR "*) ;;
+        *) recusar "o selo de $CURTO foi publicado por '$AUTOR', que não está em VERIFICACAO_PUBLICADORES ($PUBLICADORES)." ;;
+    esac
+fi
+if [ "$EXIGE_E2E" = 1 ]; then
+    case "$DESCRICAO" in
+        *"$SELO_MARCA_E2E"*) ;;
+        *) recusar "o selo de $CURTO não inclui o E2E (\"$DESCRICAO\"), exigido para $DESTINO." \
+            "Rode no commit exato: git switch --detach $CURTO && $COMANDO   (depois: git switch -)" ;;
+    esac
+fi
+
+# 5) Resumo e confirmação.
+echo "Promoção $ORIGEM → $DESTINO ($REPO)"
+echo "  $DESTINO: $(selo_curto "$PONTA_DESTINO") → $CURTO (fast-forward, $(git rev-list --count "$PONTA_DESTINO..$COMMIT") commit(s))"
+echo "  selo: $ESTADO por $AUTOR — $DESCRICAO"
+git log --oneline --no-decorate "$PONTA_DESTINO..$COMMIT" | head -n 30 | sed 's/^/    /'
+if [ "$SEM_PERGUNTA" = 0 ]; then
+    [ -t 0 ] || recusar 'sem terminal para confirmar; use --sim.'
+    printf 'Enviar para %s? [s/N] ' "$DESTINO"
+    read -r RESPOSTA
+    case "$RESPOSTA" in
+        s|S) ;;
+        *) echo 'Nada enviado.'; exit 1 ;;
+    esac
+fi
+
+# 6) O envio (nunca force-push) e a conferência.
+git push origin "$COMMIT:refs/heads/$DESTINO"
+git fetch --quiet origin "+refs/heads/$DESTINO:refs/remotes/origin/$DESTINO"
+[ "$(git rev-parse "refs/remotes/origin/$DESTINO")" = "$COMMIT" ] \
+    || recusar "o GitHub não mostra $DESTINO em $CURTO depois do push — confira."
+echo "✓ $DESTINO agora está em $CURTO (antes: $(selo_curto "$PONTA_DESTINO"))."

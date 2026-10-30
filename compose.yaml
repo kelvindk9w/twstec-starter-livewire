@@ -23,6 +23,14 @@
 #   DEV_UID / DEV_GID      o dono dos arquivos na máquina: os containers gravam
 #                          como ele (nada fica com dono root)
 #   DB_* / REDIS_PASSWORD  senhas do projeto, geradas pelo instalador
+#
+# DOIS PAPÉIS NO POSTGRESQL, como em produção: o container do PostgreSQL nasce
+# com o papel de MIGRAÇÃO (DB_MIGRATION_USERNAME, o superusuário do container
+# e dono do banco), e a aplicação — app, queue, scheduler — conecta com o
+# papel da APLICAÇÃO (DB_USERNAME), sem superusuário e sem posse: ela não
+# desliga os gatilhos das trilhas só-acréscimo. O `migrate` do init roda com
+# o de migração e cria/acerta o da aplicação. Conferir:
+#   docker compose exec app php artisan db:check-roles
 # Trocar uma porta ou o nome: edite o .env e rode `docker compose up -d` (o
 # nome novo cria containers e volumes novos, com o banco vazio).
 #
@@ -138,8 +146,8 @@ services:
     image: postgres:18-alpine
     environment:
       POSTGRES_DB: ${DB_DATABASE:?defina DB_DATABASE no .env (o instalador grava)}
-      POSTGRES_USER: ${DB_USERNAME:?defina DB_USERNAME no .env}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env (o instalador gera)}
+      POSTGRES_USER: ${DB_MIGRATION_USERNAME:?defina DB_MIGRATION_USERNAME no .env - o papel de migracao, ver o .env.example}
+      POSTGRES_PASSWORD: ${DB_MIGRATION_PASSWORD:?defina DB_MIGRATION_PASSWORD no .env - a senha do papel de migracao, ver o .env.example}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -156,8 +164,8 @@ services:
     image: postgres:18-alpine
     environment:
       PGHOST: postgres
-      PGUSER: ${DB_USERNAME}
-      PGPASSWORD: ${DB_PASSWORD}
+      PGUSER: ${DB_MIGRATION_USERNAME}
+      PGPASSWORD: ${DB_MIGRATION_PASSWORD}
       PGDATABASE: ${DB_DATABASE}
     command:
       - sh
