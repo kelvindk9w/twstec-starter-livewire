@@ -44,14 +44,18 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->plugin(AdminPlugin::make())
             // Branding 100% via platform(): nome, logo e cor primária vêm do
-            // .env — nada hardcoded.
-            ->brandName(platform()->name)
-            // Marca: o .env sempre vence; sem ele, o kit tem uma
-            // marca monocromática própria em vez de um quadrado preto.
+            // .env — nada hardcoded. O nome é lido a cada página (closure),
+            // não uma vez no boot: configuração trocada depois (testes,
+            // configuração vinda do banco) aparece no painel.
+            ->brandName(fn (): string => platform()->name)
+            // Marca: o logotipo do .env; sem ele, a inicial do nome
+            // (BrandMark) — nunca a marca do kit.
             ->brandLogo(fn () => filled(platform()->logoUrl)
                 ? (string) platform()->logoUrl
                 : BrandMark::inlineSvg())
             ->brandLogoHeight('1.75rem')
+            // Ícone da aba: o mesmo das outras telas (platform()->favicons()).
+            ->favicon(fn (): string => platform()->favicons()[0]['href'])
             // Tipografia unificada (crítica de design #6): a MESMA voz do
             // painel do usuário e da landing. Self-hosted via
             // @fontsource-variable no tema Vite — nada de CDN de fonte
@@ -76,10 +80,12 @@ class AdminPanelProvider extends PanelProvider
             // Seletor de idioma na topbar (mesmo formato compacto do resto
             // do kit: bandeira + sigla). O locale é resolvido pelo SetLocale
             // da pilha do painel (preferência da conta → cookie → padrão da
-            // plataforma).
+            // plataforma). Com um idioma só, nada (sem seletor de uma opção).
             ->renderHook(
                 PanelsRenderHook::TOPBAR_END,
-                fn (): string => view('filament.topbar-locale-switcher')->render(),
+                fn (): string => platform()->offersLocaleChoice()
+                    ? view('filament.topbar-locale-switcher')->render()
+                    : '',
             );
     }
 }

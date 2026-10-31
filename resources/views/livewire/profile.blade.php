@@ -19,6 +19,9 @@
                     required
                     :error="$errors->first('name')"
                 />
+                {{-- Com um idioma só, não há o que escolher: o campo some (o
+                     valor continua o da conta, que é o único disponível). --}}
+                @if (platform()->offersLocaleChoice())
                 <x-select
                     :label="__('panel.profile.locale_label')"
                     name="locale"
@@ -30,6 +33,7 @@
                         <option value="{{ $availableLocale }}">{{ __("ui.locale.names.{$availableLocale}") }}</option>
                     @endforeach
                 </x-select>
+                @endif
             </div>
 
             {{-- O e-mail é a chave de acesso: campo desabilitado (com fundo

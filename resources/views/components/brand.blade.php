@@ -5,8 +5,9 @@
 
 {{-- Marca da plataforma (logo + nome) — <x-brand /> ou <x-brand :href="url('/')" />.
 
-     Branding 100% via platform(): nome e logo vêm do .env. Sem logo,
-     o quadrado da cor da marca é a assinatura monocromática do kit.
+     Branding 100% via platform(): nome e logo vêm do .env. Sem logo, a
+     marca de reserva é a inicial do nome no quadrado da cor da marca — nada
+     do kit, e trocar o nome troca a marca.
 
      Existe para que cabeçalho do site, rodapé e telas de auth mostrem a MESMA
      marca — três markups iguais é uma marca esperando para divergir.
@@ -24,7 +25,7 @@
         @if (platform()->logoUrl)
             <img src="{{ platform()->logoUrl }}" alt="{{ platform()->name }}" class="h-8 w-auto">
         @else
-            <span class="inline-block h-8 w-8 shrink-0 rounded-lg bg-brand"></span>
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-sm font-bold text-brand-foreground" aria-hidden="true" data-brand-initial>{{ platform()->initial() }}</span>
         @endif
         @if ($showName)
             <span class="truncate">{{ platform()->name }}</span>
@@ -35,7 +36,7 @@
         @if (platform()->logoUrl)
             <img src="{{ platform()->logoUrl }}" alt="{{ platform()->name }}" class="h-8 w-auto">
         @else
-            <span class="inline-block h-8 w-8 shrink-0 rounded-lg bg-brand"></span>
+            <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand text-sm font-bold text-brand-foreground" aria-hidden="true" data-brand-initial>{{ platform()->initial() }}</span>
         @endif
         @if ($showName)
             <span class="truncate">{{ platform()->name }}</span>

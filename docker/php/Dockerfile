@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # =============================================================================
-# Dockerfile PHP-FPM — TWS Laravel Starter Kit
+# Dockerfile PHP-FPM do projeto
 #
 # Targets:
 #   dev        → PHP-FPM de desenvolvimento (código montado via volume bind)

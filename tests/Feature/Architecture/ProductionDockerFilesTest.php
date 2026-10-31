@@ -109,3 +109,20 @@ it('Redis, app e nginx de produção têm healthcheck, e quem depende deles espe
         ->and($service['app'])->toMatch('/redis:\s+condition: service_healthy/')
         ->and($service['horizon'])->toMatch('/redis:\s+condition: service_healthy/');
 });
+
+it('o nome do produto em produção é obrigatório, sem padrão do kit, e APP_NAME sai igual ao PLATFORM_NAME', function (): void {
+    $compose = productionFile('docker-compose.prod.yml');
+    $required = '${PROD_PLATFORM_NAME:?';
+
+    // Um padrão aqui venceria em silêncio o PLATFORM_NAME do .env.prod (o
+    // `environment` passa por cima do `env_file`), e sem APP_NAME o cache, o
+    // Redis, o Horizon e o backup ficavam com "laravel".
+    expect($compose)->toMatch('/^\s+APP_NAME: '.preg_quote($required, '/').'/m')
+        ->toMatch('/^\s+PLATFORM_NAME: '.preg_quote($required, '/').'/m')
+        ->not->toContain('Starter Kit')
+        ->not->toContain('PROD_PLATFORM_NAME:-');
+
+    // A cor da marca tem o mesmo padrão da config/platform.php: nenhum.
+    expect($compose)->toContain('PLATFORM_PRIMARY_COLOR: ${PROD_PLATFORM_PRIMARY_COLOR:-}')
+        ->and(file_get_contents(config_path('platform.php')))->toContain("'primary_color' => env('PLATFORM_PRIMARY_COLOR'),");
+});

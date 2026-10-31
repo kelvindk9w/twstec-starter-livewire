@@ -56,9 +56,15 @@ x-app-env: &app-env
   APP_DEBUG: "false"
   APP_URL: ${PROD_APP_URL:-https://localhost}
   APP_LOCALE: ${PROD_APP_LOCALE:-pt_BR}
-  PLATFORM_NAME: ${PROD_PLATFORM_NAME:-TWS Starter Kit}
+  # O nome do produto: o das telas e e-mails (PLATFORM_NAME) e o do APP_NAME
+  # (prefixo de cache, Redis, Horizon e backup). Obrigatório e sem padrão:
+  # um padrão aqui venceria em silêncio o PLATFORM_NAME do .env.prod.
+  APP_NAME: ${PROD_PLATFORM_NAME:?defina PROD_PLATFORM_NAME (o nome do produto, sem valor padrao - ver .env.prod.example)}
+  PLATFORM_NAME: ${PROD_PLATFORM_NAME:?defina PROD_PLATFORM_NAME (o nome do produto, sem valor padrao - ver .env.prod.example)}
   PLATFORM_LOGO_URL: ${PROD_PLATFORM_LOGO_URL:-}
-  PLATFORM_PRIMARY_COLOR: ${PROD_PLATFORM_PRIMARY_COLOR:-#0284C7}
+  PLATFORM_FAVICON_URL: ${PROD_PLATFORM_FAVICON_URL:-}
+  PLATFORM_FAVICON_SVG_URL: ${PROD_PLATFORM_FAVICON_SVG_URL:-}
+  PLATFORM_PRIMARY_COLOR: ${PROD_PLATFORM_PRIMARY_COLOR:-}
   # Quem pode dizer QUEM É O CLIENTE (ver Twstec\Kit\Foundation\Http\TrustedProxies).
   #
   # O PADRÃO É VAZIO — nenhum proxy confiável, `X-Forwarded-*` ignorado. Não há

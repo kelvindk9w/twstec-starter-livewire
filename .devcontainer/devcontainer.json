@@ -6,7 +6,7 @@
 // com o projeto em /var/www/html. Abra a pasta do projeto no VS Code e use
 // "Reopen in Container" (extensão Dev Containers).
 {
-    "name": "TWS Laravel Starter Kit (Livewire)",
+    "name": "Laravel (Livewire)",
     "dockerComposeFile": ["../compose.yaml"],
     "service": "app",
     "workspaceFolder": "/var/www/html",

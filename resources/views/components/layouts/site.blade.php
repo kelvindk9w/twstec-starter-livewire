@@ -42,6 +42,10 @@
         <style>:root { --brand: {{ platform()->primaryColor }}; }</style>
     @endif
 
+    {{-- Ícone da aba: PLATFORM_FAVICON_URL / PLATFORM_FAVICON_SVG_URL, o
+         logotipo ou a inicial do nome gerada (BrandMark) — nunca o do kit. --}}
+    {{ \Twstec\Kit\Foundation\Support\BrandMark::faviconLinks() }}
+
     {{-- Tema claro/escuro/sistema: aplica a classe ANTES do primeiro paint
          (sem flash). Default = preferência do SO; escolha persiste em
          localStorage (dispositivo) e na conta (users.theme). --}}

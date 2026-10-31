@@ -3,14 +3,9 @@
 declare(strict_types=1);
 
 use Composer\InstalledVersions;
-use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 use Twstec\Kit\Foundation\Kit;
-
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
 
 // =============================================================================
 // Assets do Filament nos scripts do Composer (composer.json → scripts).

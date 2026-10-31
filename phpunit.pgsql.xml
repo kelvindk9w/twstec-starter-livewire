@@ -56,6 +56,11 @@
              env_file (.env), e o Laravel lê $_SERVER primeiro. Sem isto, o
              ambiente de teste NÃO é testing (CSRF fica ativo etc.). -->
         <env name="APP_ENV" value="testing"/>
+        <!-- Os idiomas da suíte são os do kit (os três com tradução), não os do
+             .env de quem roda: um projeto com um idioma só continua com a suíte
+             verde, e os testes do idioma único declaram o deles. -->
+        <env name="PLATFORM_LOCALE" value="pt_BR" force="true"/>
+        <env name="PLATFORM_AVAILABLE_LOCALES" value="pt_BR,en,es" force="true"/>
         <server name="APP_ENV" value="testing" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>

@@ -17,7 +17,7 @@ return [
     ],
 
     'footer' => [
-        'tagline' => 'Starter kit Laravel para SaaS — base estrutural pronta para construir.',
+        'tagline' => 'Entre ou crie a sua conta para começar.',
         'links_heading' => 'Atalhos',
         'api_status' => 'Status da API',
         'rights' => '© :year :company — Todos os direitos reservados',

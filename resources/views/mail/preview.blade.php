@@ -42,6 +42,7 @@
             <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-border bg-surface p-4">
 
+                    @if (platform()->offersLocaleChoice())
                     <div class="flex items-center gap-2">
                         <span class="text-caption text-gray-500 dark:text-gray-400">{{ __('mail.preview.language') }}</span>
                         @foreach (platform()->availableLocales as $locale)
@@ -55,6 +56,7 @@
                             >{{ __('mail.preview.locales.'.$locale) }}</a>
                         @endforeach
                     </div>
+                    @endif
 
                     <div class="flex items-center gap-2">
                         <span class="text-caption text-gray-500 dark:text-gray-400">{{ __('mail.preview.scheme') }}</span>
@@ -111,7 +113,7 @@
                     <pre class="mt-3 overflow-x-auto whitespace-pre-wrap break-words rounded-lg bg-surface-sunken p-4 font-mono text-caption text-gray-700 dark:text-gray-300">{{ $email['text'] }}</pre>
                 </details>
 
-                <p class="mt-4 text-caption text-gray-500 dark:text-gray-400">{{ __('mail.preview.mailpit_hint') }}</p>
+                <p class="mt-4 text-caption text-gray-500 dark:text-gray-400">{{ filled(config('mail.preview.mailpit_url')) ? __('mail.preview.mailpit_hint', ['url' => (string) config('mail.preview.mailpit_url')]) : __('mail.preview.mailpit_hint_generic') }}</p>
             </div>
         </div>
     </main>

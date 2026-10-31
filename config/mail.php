@@ -129,6 +129,14 @@ return [
 
     'preview' => [
         'enabled' => (bool) env('MAIL_PREVIEW_ENABLED', env('APP_ENV') === 'local'),
+
+        // Endereço do Mailpit DESTE projeto, citado na galeria. Sem
+        // MAIL_PREVIEW_MAILPIT_URL, o host da APP_URL na porta DEV_MAIL_PORT
+        // (o Docker de desenvolvimento do projeto criado); sem as duas, a
+        // galeria fala do Mailpit sem endereço.
+        'mailpit_url' => env('MAIL_PREVIEW_MAILPIT_URL') ?: (env('DEV_MAIL_PORT')
+            ? 'http://'.(parse_url((string) env('APP_URL', ''), PHP_URL_HOST) ?: 'localhost').':'.env('DEV_MAIL_PORT')
+            : null),
     ],
 
 ];

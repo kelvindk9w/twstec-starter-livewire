@@ -12,14 +12,23 @@
 
 return [
 
-    // Nome público da plataforma (telas, e-mails, metadados).
-    'name' => env('PLATFORM_NAME', 'TWS Starter Kit'),
+    // Nome público da plataforma (telas, e-mails, metadados). Sem
+    // PLATFORM_NAME, o APP_NAME — nunca um nome do kit.
+    'name' => env('PLATFORM_NAME') ?: env('APP_NAME', 'Laravel'),
 
-    // Versão da plataforma (endpoint /api/health, rodapés, suporte).
-    'version' => env('PLATFORM_VERSION', '2.0.0-beta.17'),
+    // Versão da plataforma (endpoint /api/health, rodapés, suporte): a do
+    // PRODUTO, não a do kit.
+    'version' => env('PLATFORM_VERSION') ?: '0.1.0',
 
-    // URL do logotipo oficial (nunca caminho hardcoded em views).
+    // URL do logotipo oficial (nunca caminho hardcoded em views). Vazio = a
+    // marca de reserva: a inicial do nome, na cor da marca (BrandMark).
     'logo_url' => env('PLATFORM_LOGO_URL'),
+
+    // Ícone da aba (favicon) em qualquer formato (.ico, .png...) e a variante
+    // SVG. Vazios = o logotipo; sem logotipo, a inicial do nome gerada em SVG
+    // (sem arquivo nenhum em public/).
+    'favicon_url' => env('PLATFORM_FAVICON_URL'),
+    'favicon_svg_url' => env('PLATFORM_FAVICON_SVG_URL'),
 
     // Override OPCIONAL da cor primária da marca (hex). Vazio = identidade
     // monocromática dos tokens (theme.css: preto no claro, branco no escuro —
@@ -28,7 +37,8 @@ return [
     'primary_color' => env('PLATFORM_PRIMARY_COLOR'),
 
     // URL institucional oficial do produto.
-    'official_url' => env('PLATFORM_OFFICIAL_URL', env('APP_URL', 'http://localhost:8180')),
+    // Sem ela, a APP_URL.
+    'official_url' => env('PLATFORM_OFFICIAL_URL') ?: env('APP_URL', 'http://localhost'),
 
     // URL pública do repositório do projeto (CTA da landing).
     'repo_url' => env('PLATFORM_REPO_URL'),
@@ -37,7 +47,8 @@ return [
     'contact_email' => env('PLATFORM_CONTACT_EMAIL'),
 
     // Empresa operadora (rodapé: direitos autorais e "desenvolvido por").
-    'company_name' => env('PLATFORM_COMPANY_NAME', 'TWS'),
+    // Vazia = o nome da plataforma.
+    'company_name' => env('PLATFORM_COMPANY_NAME') ?: (env('PLATFORM_NAME') ?: env('APP_NAME', 'Laravel')),
     'company_url' => env('PLATFORM_COMPANY_URL'),
 
     // E-mail público de suporte.
@@ -49,10 +60,12 @@ return [
     // Locale padrão da plataforma (MVP: pt-BR; multi-idioma preparado via lang/).
     'locale' => env('PLATFORM_LOCALE', 'pt_BR'),
 
-    // Idiomas disponíveis na UI (seletor de idioma + middleware SetLocale).
-    // O padrão do kit continua sendo 'locale' acima; visitantes escolhem via
-    // cookie e usuários logados persistem a preferência na conta (users.locale).
-    'available_locales' => array_values(array_filter(explode(',', (string) env('PLATFORM_AVAILABLE_LOCALES', 'pt_BR,en,es')))),
+    // Idiomas disponíveis na UI (seletor de idioma + middleware SetLocale),
+    // separados por vírgula. Sem PLATFORM_AVAILABLE_LOCALES, só o idioma
+    // padrão acima — e, com um idioma só, nenhum seletor aparece
+    // (platform()->offersLocaleChoice()). Visitantes escolhem via cookie e
+    // usuários logados persistem a preferência na conta (users.locale).
+    'available_locales' => array_values(array_filter(explode(',', (string) (env('PLATFORM_AVAILABLE_LOCALES') ?: env('PLATFORM_LOCALE', 'pt_BR'))))),
 
     // Timezone de EXIBIÇÃO (borda). Internamente tudo é UTC.
     'display_timezone' => env('PLATFORM_DISPLAY_TIMEZONE', 'America/Sao_Paulo'),

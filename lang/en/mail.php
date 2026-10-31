@@ -103,7 +103,7 @@ return [
     // Email preview screen (/mail-preview) — development only.
     'preview' => [
         'title' => 'Email preview',
-        'subtitle' => 'Every transactional email in the kit with sample data, in the three languages and both themes. A development tool: in production this route returns 404.',
+        'subtitle' => 'Every transactional email in the project with sample data, in each available language and both themes. A development tool: in production this route returns 404.',
         'list_heading' => 'Emails',
         'language' => 'Language',
         'scheme' => 'Theme',
@@ -111,7 +111,8 @@ return [
         'plain_text' => 'Plain text version',
         'open_html' => 'Open the HTML',
         'open_text' => 'View plain text',
-        'mailpit_hint' => 'To check how the email actually arrives (headers, multipart, attachments), trigger the flow and open Mailpit at http://localhost:18025.',
+        'mailpit_hint' => 'To check how the email actually arrives (headers, multipart, attachments), trigger the flow and open Mailpit at :url.',
+        'mailpit_hint_generic' => 'To check how the email actually arrives (headers, multipart, attachments), trigger the flow and open the Mailpit of the development environment.',
         'emails' => [
             'email-verification' => 'Email confirmation',
             'verification-code' => 'Verification code',

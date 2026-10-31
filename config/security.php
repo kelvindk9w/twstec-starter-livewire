@@ -434,6 +434,24 @@ return [
         // /admin tem o seu próprio.
         'livewire_paths' => ['livewire/*', 'livewire-*', 'admin/livewire/*'],
 
+        // Caminhos com CORPO AUTENTICADO POR ASSINATURA na aplicação (webhook
+        // RECEBIDO de um provedor, conferido por HMAC antes de qualquer uso),
+        // separados por vírgula, na sintaxe de `Request::is()`. Nesses
+        // caminhos o filtro NÃO inspeciona o conteúdo do corpo — nem recusa,
+        // em nenhum modo — e a trilha (request_logs) nunca grava o corpo, só o
+        // tamanho e o formato: o texto é de terceiros (a mensagem de um
+        // cliente final é dado pessoal), e recusá-lo faria o provedor reenviar
+        // e, por fim, descartar a mensagem. Query, cabeçalhos e caminho
+        // continuam inspecionados, e o teto abaixo continua contando o corpo.
+        //
+        // Só para rota que RECUSA corpo sem assinatura válida. Vale apenas
+        // caminho literal (`webhooks/whatsapp`) ou prefixo literal terminado
+        // em `/*` (`webhooks/meta/*`); curinga no começo ou no meio, parcial
+        // (`webhooks*`) ou sozinho é RECUSADO (o corpo continua inspecionado) e
+        // avisado no log a cada boot em produção. Vazio (padrão) = nenhum. Ver
+        // Twstec\Kit\Foundation\Security\SignedBodyPaths e docs/seguranca.md.
+        'signed_body_paths' => array_filter(array_map('trim', explode(',', (string) env('SECURITY_VALIDATION_SIGNED_BODY_PATHS', '')))),
+
         // TETO de bytes que a detecção de ataque inspeciona por requisição
         // (soma de chaves e valores de texto de query + corpo, mais um custo
         // fixo de 8 bytes por item — senão milhões de itens vazios passariam

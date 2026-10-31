@@ -25,6 +25,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
     <title>{{ __('security.throttled.title') }} · 429</title>
+    {{ \Twstec\Kit\Foundation\Support\BrandMark::faviconLinks() }}
     <style>
         :root { color-scheme: light dark; --bg: #f7f7f8; --card: #ffffff; --text: #1d1d22; --muted: #5d5d6a; --line: #e4e4ea; --accent: #4f46e5; --accent-text: #ffffff; }
         @media (prefers-color-scheme: dark) {

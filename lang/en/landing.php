@@ -16,7 +16,7 @@ return [
     ],
 
     'footer' => [
-        'tagline' => 'Laravel starter kit for SaaS — a ready structural base to build on.',
+        'tagline' => 'Sign in or create your account to get started.',
         'links_heading' => 'Shortcuts',
         'api_status' => 'API status',
         'rights' => '© :year :company — All rights reserved',

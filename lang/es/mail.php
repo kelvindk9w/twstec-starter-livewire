@@ -103,7 +103,7 @@ return [
     // Pantalla de vista previa de correos (/mail-preview) — solo en desarrollo.
     'preview' => [
         'title' => 'Vista previa de los correos',
-        'subtitle' => 'Todos los correos transaccionales del kit con datos de ejemplo, en los tres idiomas y en los dos temas. Herramienta de desarrollo: en producción esta ruta responde 404.',
+        'subtitle' => 'Todos los correos transaccionales del proyecto con datos de ejemplo, en cada idioma disponible y en los dos temas. Herramienta de desarrollo: en producción esta ruta responde 404.',
         'list_heading' => 'Correos',
         'language' => 'Idioma',
         'scheme' => 'Tema',
@@ -111,7 +111,8 @@ return [
         'plain_text' => 'Versión en texto plano',
         'open_html' => 'Abrir el HTML',
         'open_text' => 'Ver el texto plano',
-        'mailpit_hint' => 'Para comprobar cómo llega el correo de verdad (cabeceras, multipart, adjuntos), dispara el flujo y abre Mailpit en http://localhost:18025.',
+        'mailpit_hint' => 'Para comprobar cómo llega el correo de verdad (cabeceras, multipart, adjuntos), dispara el flujo y abre Mailpit en :url.',
+        'mailpit_hint_generic' => 'Para comprobar cómo llega el correo de verdad (cabeceras, multipart, adjuntos), dispara el flujo y abre el Mailpit del entorno de desarrollo.',
         'emails' => [
             'email-verification' => 'Confirmación de correo',
             'verification-code' => 'Código de verificación',

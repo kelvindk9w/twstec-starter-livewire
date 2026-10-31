@@ -9,7 +9,10 @@
      Cada item é um LINK real para a rota locale.switch (cookie + preferência
      da conta) — funciona sem JS de formulário e abre em nova aba se o usuário
      quiser. O mesmo componente é usado na landing, no painel e na topbar do
-     /admin (via render hook do Filament). --}}
+     /admin (via render hook do Filament).
+
+     Com um idioma só (platform()->offersLocaleChoice()), não renderiza nada. --}}
+@if (platform()->offersLocaleChoice())
 @php
     $currentLocale = app()->getLocale();
     // Sigla curta exibida no gatilho (a lista traz o nome por extenso).
@@ -37,3 +40,4 @@
         </x-dropdown-item>
     @endforeach
 </x-dropdown>
+@endif
