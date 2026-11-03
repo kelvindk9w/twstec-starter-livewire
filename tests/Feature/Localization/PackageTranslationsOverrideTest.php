@@ -51,6 +51,8 @@ afterEach(function (): void {
 });
 
 it('(a) chave que só o pacote tem: texto do pacote', function (string $locale): void {
+    requireLocales($locale);
+
     starterLangWith([]);
 
     expect(__('security.blocked', [], $locale))->toBe(foundationPackageLang("{$locale}/security.php")['blocked'])
@@ -58,6 +60,8 @@ it('(a) chave que só o pacote tem: texto do pacote', function (string $locale):
 })->with(['pt_BR', 'en', 'es']);
 
 it('(b) a mesma chave no lang/ do aplicativo: texto do aplicativo', function (string $locale): void {
+    requireLocales($locale);
+
     starterLangWith([
         "{$locale}/mail.php" => ['footer' => ['transactional' => "Rodapé do meu produto ({$locale})"]],
         "{$locale}/security.php" => ['blocked' => "Recusado pelo meu produto ({$locale})"],
@@ -68,11 +72,12 @@ it('(b) a mesma chave no lang/ do aplicativo: texto do aplicativo', function (st
 })->with(['pt_BR', 'en', 'es']);
 
 it('(c) mail.php repartido: chaves do aplicativo e do pacote no mesmo grupo', function (string $locale): void {
-    $appMail = require lang_path("{$locale}/mail.php");
+    requireLocales($locale);
 
     starterLangWith(["{$locale}/mail.php" => ['footer' => ['cnpj' => "CNPJ do meu produto ({$locale})"]]]);
 
     expect(__('mail.footer.cnpj', [], $locale))->toBe("CNPJ do meu produto ({$locale})")
         ->and(__('mail.footer.transactional', [], $locale))->toBe(foundationPackageLang("{$locale}/mail.php")['footer']['transactional'])
-        ->and(__('mail.password_reset.heading', [], $locale))->toBe($appMail['password_reset']['heading']);
+        ->and(__('mail.password_reset.heading', [], $locale))->toBe((require base_path("vendor/twstec/kit-auth/lang/{$locale}/mail.php"))['password_reset']['heading'])
+        ->and(__('mail.preview.title', [], $locale))->toBe((require lang_path("{$locale}/mail.php"))['preview']['title']);
 })->with(['pt_BR', 'en', 'es']);

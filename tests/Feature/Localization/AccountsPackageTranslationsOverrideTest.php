@@ -50,6 +50,8 @@ afterEach(function (): void {
 });
 
 it('(a) mensagem que só o pacote tem: texto do pacote', function (string $locale): void {
+    requireLocales($locale);
+
     starterLangWithAccounts([]);
 
     expect(__('api_keys.auth.invalid', [], $locale))->toBe(accountsPackageLangFile("{$locale}/api_keys.php")['auth']['invalid'])
@@ -58,6 +60,8 @@ it('(a) mensagem que só o pacote tem: texto do pacote', function (string $local
 })->with(['pt_BR', 'en', 'es']);
 
 it('(b) a mesma chave no lang/ do aplicativo: texto do aplicativo — inclusive na resposta da API', function (string $locale): void {
+    requireLocales($locale);
+
     starterLangWithAccounts([
         "{$locale}/api_keys.php" => [
             'auth' => ['invalid' => "Chave recusada pelo meu produto ({$locale})"],
@@ -77,14 +81,15 @@ it('(b) a mesma chave no lang/ do aplicativo: texto do aplicativo — inclusive 
         ->assertJsonPath('error.message', "Chave recusada pelo meu produto ({$locale})");
 })->with(['pt_BR', 'en', 'es']);
 
-it('(c) mail.php repartido: assunto do pacote, corpo do aplicativo e rodapé do foundation no mesmo grupo', function (string $locale): void {
-    $appMail = require lang_path("{$locale}/mail.php");
+it('(c) mail.php repartido entre pacotes: assunto e corpo do de contas, rodapé do foundation, no mesmo grupo', function (string $locale): void {
+    requireLocales($locale);
 
     starterLangWithAccounts(["{$locale}/api_keys.php" => ['keys' => ['revoked' => "Revogada no meu produto ({$locale})"]]]);
 
     expect(__('api_keys.keys.revoked', [], $locale))->toBe("Revogada no meu produto ({$locale})")
         ->and(__('api_keys.keys.rotated', [], $locale))->toBe(accountsPackageLangFile("{$locale}/api_keys.php")['keys']['rotated'])
         ->and(__('mail.api_key_inactivity.subject', [], $locale))->toBe(accountsPackageLangFile("{$locale}/mail.php")['api_key_inactivity']['subject'])
-        ->and(__('mail.api_key_inactivity.heading', [], $locale))->toBe($appMail['api_key_inactivity']['heading'])
+        ->and(__('mail.api_key_inactivity.heading', [], $locale))->toBe(accountsPackageLangFile("{$locale}/mail.php")['api_key_inactivity']['heading'])
+        ->and(__('panel.api_keys.title', [], $locale))->toBe(accountsPackageLangFile("{$locale}/panel.php")['api_keys']['title'])
         ->and(__('mail.footer.transactional', [], $locale))->toBe((require base_path('vendor/twstec/kit-foundation/lang/'.$locale.'/mail.php'))['footer']['transactional']);
 })->with(['pt_BR', 'en', 'es']);

@@ -113,6 +113,8 @@ it('envia a notificação própria de reset (traduzida), não a do framework', f
 });
 
 it('renderiza o e-mail de reset no idioma da conta', function (string $locale, string $trecho) {
+    requireLocales($locale);
+
     $user = User::factory()->create(['locale' => $locale]);
 
     app()->setLocale($locale);
@@ -134,6 +136,8 @@ it('renderiza o e-mail de reset no idioma da conta', function (string $locale, s
 ]);
 
 it('o usuário expõe a preferência de idioma para as notificações enfileiradas', function () {
+    requireLocales('en', 'es');
+
     $user = User::factory()->create(['locale' => 'es']);
 
     expect($user)->toBeInstanceOf(HasLocalePreference::class)

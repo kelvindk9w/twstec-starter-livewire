@@ -313,7 +313,7 @@ it('a poda é agendada diariamente, em um servidor só, e a janela padrão é 36
     expect($evento)->not->toBeNull('poda da trilha de auditoria não agendada')
         ->and($evento->expression)->toBe('0 0 * * *')
         ->and($evento->onOneServer)->toBeTrue()
-        ->and(require base_path('config/audit.php'))->toHaveKey('retention_days');
+        ->and(require kitConfigFile('audit'))->toHaveKey('retention_days');
 
     // Instalação nova, sem .env: o padrão vale.
     $semEnv = (function (): int {
@@ -322,7 +322,7 @@ it('a poda é agendada diariamente, em um servidor só, e a janela padrão é 36
         putenv('AUDIT_RETENTION_DAYS');
 
         try {
-            return (require base_path('config/audit.php'))['retention_days'];
+            return (require kitConfigFile('audit'))['retention_days'];
         } finally {
             if ($anterior !== null) {
                 $_ENV['AUDIT_RETENTION_DAYS'] = $anterior;

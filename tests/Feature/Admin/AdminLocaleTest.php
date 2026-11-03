@@ -9,6 +9,10 @@ use App\Models\User;
 // expõe o seletor compacto (bandeira + sigla) na topbar.
 
 beforeEach(function () {
+    // O arquivo exercita a troca entre os três idiomas: projeto que apagou
+    // en/es pula (o caso de um idioma só fica em SingleLocaleTest.php).
+    requireLocales('en', 'es');
+
     $this->admin = User::factory()->create();
     $this->admin->forceFill(['is_admin' => true, 'admin_role' => 'owner'])->save();
 });

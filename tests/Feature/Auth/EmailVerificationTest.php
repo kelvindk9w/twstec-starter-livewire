@@ -76,6 +76,8 @@ it('o cadastro envia o e-mail de verificação e leva à tela de aviso, não ao 
 });
 
 it('a conta nasce no idioma em que a pessoa se cadastrou (o e-mail sai nele)', function (): void {
+    requireLocales('en', 'es');
+
     Notification::fake();
 
     $this->withCookie(SetLocale::COOKIE, 'es')->post('/register', dadosDeCadastro());
@@ -84,6 +86,8 @@ it('a conta nasce no idioma em que a pessoa se cadastrou (o e-mail sai nele)', f
 });
 
 it('o e-mail real sai no layout do kit, no idioma do destinatário e com o link ancorado em APP_URL', function (string $locale): void {
+    requireLocales($locale);
+
     config(['app.url' => 'https://app.example.com']);
 
     // Mesmo que as URLs da requisição estivessem sendo montadas com outro host
@@ -192,6 +196,8 @@ it('conta sem e-mail confirmado não executa ação Livewire do perfil pelo endp
 });
 
 it('a mensagem de JSON sai no idioma da conta', function (): void {
+    requireLocales('en', 'es');
+
     $user = User::factory()->unverified()->create(['locale' => 'en']);
 
     $this->actingAs($user)->getJson('/dashboard')
@@ -217,6 +223,8 @@ it('a tela de aviso mostra o e-mail, o reenvio e a saída, no layout do site', f
 });
 
 it('a tela de aviso sai no idioma da conta', function (): void {
+    requireLocales('en', 'es');
+
     $user = User::factory()->unverified()->create(['locale' => 'es']);
 
     $this->actingAs($user)->get(route('verification.notice'))

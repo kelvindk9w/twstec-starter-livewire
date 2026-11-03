@@ -86,6 +86,8 @@ it('a dica dos formulários descreve só o que está ativo', function () {
 });
 
 it('a dica existe nos 3 idiomas', function (string $locale) {
+    requireLocales($locale);
+
     app()->setLocale($locale);
     politicaDeSenha(['symbols' => true]);
 
@@ -150,6 +152,8 @@ it('o admin demo semeado consegue logar com a senha da config', function () {
 })->group('demo');
 
 it('a mensagem de senha fraca sai no idioma ativo, nunca em inglês fixo', function (string $locale, string $trecho) {
+    requireLocales($locale);
+
     app()->setLocale($locale);
     politicaDeSenha(['mixed_case' => true]);
 

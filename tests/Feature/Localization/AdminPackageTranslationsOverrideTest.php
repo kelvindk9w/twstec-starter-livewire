@@ -53,6 +53,8 @@ afterEach(function (): void {
 });
 
 it('(a) texto que só o pacote tem: texto do pacote', function (string $locale): void {
+    requireLocales($locale);
+
     starterLangWithAdmin([]);
 
     $pacote = adminPackageLangFile("{$locale}/admin.php");
@@ -63,6 +65,8 @@ it('(a) texto que só o pacote tem: texto do pacote', function (string $locale):
 })->with(['pt_BR', 'en', 'es']);
 
 it('(b) a mesma chave no lang/ do aplicativo: texto do aplicativo — inclusive na tela do painel', function (string $locale): void {
+    requireLocales($locale);
+
     starterLangWithAdmin([
         "{$locale}/admin.php" => ['users' => ['create' => "Cadastrar pessoa no meu produto ({$locale})"]],
     ]);
@@ -77,6 +81,8 @@ it('(b) a mesma chave no lang/ do aplicativo: texto do aplicativo — inclusive 
 })->with(['pt_BR', 'en', 'es']);
 
 it('(c) grupo repartido: a demo (lang/ do app) e o produto (pacote) resolvem do lado certo no mesmo grupo admin', function (string $locale): void {
+    requireLocales($locale);
+
     starterLangWithAdmin(["{$locale}/admin.php" => ['users' => ['blocked' => "Barrada no meu produto ({$locale})"]]]);
 
     $pacote = adminPackageLangFile("{$locale}/admin.php");

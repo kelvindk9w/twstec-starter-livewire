@@ -47,6 +47,8 @@ it('marca o idioma do documento com o locale em vigor', function (): void {
 });
 
 it('manda a recuperação de senha no idioma da CONTA, não no do servidor', function (): void {
+    requireLocales('en', 'es');
+
     // Quem escolhe o idioma é o destinatário: o User implementa
     // HasLocalePreference e o Laravel troca o locale ao enviar/enfileirar.
     $user = User::factory()->create(['locale' => 'es']);

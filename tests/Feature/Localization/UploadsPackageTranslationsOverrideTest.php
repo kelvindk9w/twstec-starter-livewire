@@ -52,6 +52,8 @@ afterEach(function (): void {
 });
 
 it('(a) mensagem que só o pacote tem: texto do pacote', function (string $locale): void {
+    requireLocales($locale);
+
     starterLangWithUploads([]);
 
     $pacote = uploadsPackageLangFile("{$locale}/uploads.php");
@@ -62,6 +64,8 @@ it('(a) mensagem que só o pacote tem: texto do pacote', function (string $local
 })->with(['pt_BR', 'en', 'es']);
 
 it('(b) a mesma chave no lang/ do aplicativo: texto do aplicativo — inclusive na resposta da API', function (string $locale): void {
+    requireLocales($locale);
+
     starterLangWithUploads([
         "{$locale}/uploads.php" => [
             'stored' => "Recebido pelo meu produto ({$locale})",
@@ -84,6 +88,8 @@ it('(b) a mesma chave no lang/ do aplicativo: texto do aplicativo — inclusive 
 })->with(['pt_BR', 'en', 'es']);
 
 it('(c) grupo repartido: cada chave de uploads resolve do lado certo — app e pacote no mesmo grupo', function (string $locale): void {
+    requireLocales($locale);
+
     starterLangWithUploads(["{$locale}/uploads.php" => ['rejected' => ['empty' => "Vazio no meu produto ({$locale})"]]]);
 
     $pacote = uploadsPackageLangFile("{$locale}/uploads.php");

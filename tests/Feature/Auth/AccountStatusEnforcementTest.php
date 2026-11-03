@@ -135,6 +135,8 @@ it('conta ativa continua operando o painel, inclusive a ação Livewire', functi
 })->group('accounts');
 
 it('a mensagem do encerramento sai no idioma da conta', function (): void {
+    requireLocales('en', 'es');
+
     $user = User::factory()->create(['locale' => 'en']);
 
     $this->actingAs($user)->get('/dashboard')->assertOk();

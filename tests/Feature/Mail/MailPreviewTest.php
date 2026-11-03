@@ -54,6 +54,8 @@ it('serve o HTML cru e o texto puro na mesma rota', function (): void {
 })->group('demo');
 
 it('troca idioma e tema pela URL', function (): void {
+    requireLocales('en', 'es');
+
     config()->set('ui.demo_login.enabled', true);
 
     $this->get('/mail-preview/verification-code?lang=es&format=html')

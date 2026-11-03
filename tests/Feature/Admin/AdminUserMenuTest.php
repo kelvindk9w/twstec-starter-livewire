@@ -85,6 +85,8 @@ it('as iniciais são a primeira e a última palavra do nome, com queda para "?"'
 });
 
 it('o seletor de idioma segue na topbar, e não dentro do menu do usuário', function () {
+    requireLocales('en', 'es');
+
     $this->get('/admin')
         ->assertOk()
         ->assertSee('tws-locale', false)

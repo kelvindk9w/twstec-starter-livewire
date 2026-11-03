@@ -280,6 +280,8 @@ it('toda string da landing passa pelo arquivo de idioma (sem chave crua na tela)
 });
 
 it('fala os três idiomas do kit', function (string $locale) {
+    requireLocales($locale);
+
     $this->withCookie(SetLocale::COOKIE, $locale)
         ->get('/')
         ->assertOk()

@@ -205,6 +205,8 @@ it('tem o alternador tabela/cartões da base e a ação de ver no cartão', func
 });
 
 it('tem as traduções da tela nos três idiomas', function (string $locale) {
+    requireLocales($locale);
+
     // As chaves da tela vêm do pacote twstec/kit-admin; as dos tipos da
     // demonstração, do lang/admin.php do pacote dela (mesmo grupo).
     foreach (array_keys(array_replace((require base_path('vendor/twstec/kit-admin/lang/pt_BR/admin.php'))['audit'], (require base_path('vendor/twstec/kit-demo/lang/pt_BR/admin.php'))['audit'])) as $chave) {

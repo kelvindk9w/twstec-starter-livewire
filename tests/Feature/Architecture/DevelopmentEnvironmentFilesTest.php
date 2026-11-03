@@ -55,7 +55,7 @@ it('o banco da suíte PostgreSQL do db-init é <DB_DATABASE>_test', function ():
 it('rotas sensíveis: 30 no desenvolvimento (o .env.example), 5 na produção', function (): void {
     expect((string) file_get_contents(base_path('.env.example')))->toMatch('/^RATE_LIMIT_SENSITIVE=30$/m')
         ->and((string) file_get_contents(base_path('.env.prod.example')))->toMatch('/^# RATE_LIMIT_SENSITIVE=5$/m')
-        ->and((string) file_get_contents(config_path('security.php')))->toContain("env('RATE_LIMIT_SENSITIVE', 5)");
+        ->and((string) file_get_contents(kitConfigFile('security')))->toContain("env('RATE_LIMIT_SENSITIVE', 5)");
 });
 
 it('o CI base: manual e semanal, só leitura, ações fixadas por commit', function (): void {

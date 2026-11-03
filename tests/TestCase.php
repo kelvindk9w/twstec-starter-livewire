@@ -8,8 +8,10 @@ use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
 use PDO;
 use RuntimeException;
+use Tests\Support\ProjectLocales;
 use Twstec\Kit\Foundation\Database\DatabaseRoles;
 use Twstec\Kit\Foundation\Kit;
+use Twstec\Kit\Foundation\Support\Platform;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -46,6 +48,26 @@ abstract class TestCase extends BaseTestCase
             if (in_array($module, $this->groups(), true) && ! Kit::has($module)) {
                 $this->markTestSkipped(sprintf('Módulo opcional %s (%s) não instalado.', $module, Kit::package($module)));
             }
+        }
+
+        $this->limitLocalesToProject();
+    }
+
+    /**
+     * IDIOMAS DA SUÍTE: os do phpunit.xml (PLATFORM_AVAILABLE_LOCALES) que o
+     * projeto TEM em lang/. Projeto que apagou en/es testa como projeto de um
+     * idioma só; o teste que precisa de um idioma ausente pula
+     * (requireLocales() em tests/Pest.php). Com as três pastas, nada muda.
+     */
+    private function limitLocalesToProject(): void
+    {
+        /** @var list<string> $configured */
+        $configured = array_values(array_map('strval', (array) config('platform.available_locales')));
+        $available = ProjectLocales::availableAmong($configured, lang_path());
+
+        if ($available !== $configured && $available !== []) {
+            config(['platform.available_locales' => $available]);
+            $this->app?->forgetInstance(Platform::class);
         }
     }
 

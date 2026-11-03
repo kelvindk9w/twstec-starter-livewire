@@ -6,15 +6,16 @@ use App\Models\User;
 use Twstec\Kit\Accounts\ApiKeys\Models\ApiKey;
 use Twstec\Kit\Accounts\ApiKeys\Support\ApiKeyHasher;
 
-// A CÓPIA DO CONFIG DO APLICATIVO (config/api_keys.php, que prevalece sobre a
-// do pacote) também trata o pepper vazio como ausente. O .env.example trazia
+// O PADRÃO QUE O PROJETO RECEBE (config/api_keys.php do twstec/kit-accounts:
+// o projeto não tem cópia, ver docs/personalizacao.md) trata o pepper vazio
+// como ausente. O .env.example trazia
 // `API_KEYS_HASH_PEPPER=` sem valor — e o container de dev injeta exatamente
 // isso —, o que não aciona o fallback do env(): o HMAC rodava com pepper de 0
 // caracteres. A regra completa (peppers anteriores, legado, avisos) é provada
 // na suíte do pacote twstec/kit-accounts, numa aplicação limpa.
 
 /**
- * Lê o config/api_keys.php do aplicativo com as variáveis dadas no ambiente,
+ * Lê o config/api_keys.php do kit com as variáveis dadas no ambiente,
  * como o boot faria, e devolve o ambiente como estava.
  *
  * @param  array<string, string>  $vars
@@ -31,7 +32,7 @@ function appApiKeysConfigWith(array $vars): array
     }
 
     try {
-        return require config_path('api_keys.php');
+        return require kitConfigFile('api_keys');
     } finally {
         foreach ($previous as $name => $value) {
             if ($value === null) {
@@ -45,7 +46,7 @@ function appApiKeysConfigWith(array $vars): array
     }
 }
 
-it('pepper vazio ou só com espaços no .env vira a APP_KEY na cópia do config do aplicativo', function (string $valor) {
+it('pepper vazio ou só com espaços no .env vira a APP_KEY no config que o projeto recebe', function (string $valor) {
     $config = appApiKeysConfigWith(['API_KEYS_HASH_PEPPER' => $valor]);
 
     expect($config['hash_pepper'])->toBe(env('APP_KEY'))
@@ -55,7 +56,7 @@ it('pepper vazio ou só com espaços no .env vira a APP_KEY na cópia do config 
     'só espaços' => ['   '],
 ]);
 
-it('pepper dedicado, peppers anteriores e a flag do legado vêm do .env na cópia do aplicativo', function () {
+it('pepper dedicado, peppers anteriores e a flag do legado vêm do .env no config que o projeto recebe', function () {
     $config = appApiKeysConfigWith([
         'API_KEYS_HASH_PEPPER' => 'pepper-dedicado-5e1b',
         'API_KEYS_PREVIOUS_HASH_PEPPERS' => 'anterior-1, ,anterior-2',

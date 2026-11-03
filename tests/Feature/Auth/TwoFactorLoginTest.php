@@ -433,6 +433,8 @@ it('redefinir a senha por e-mail NÃO desliga o segundo fator (e o login segue p
 });
 
 it('o e-mail do código de login sai no idioma do destinatário, com o texto do login', function () {
+    requireLocales('en', 'es');
+
     $user = tfaUser(['locale' => 'es']);
 
     tfaPassword($user);

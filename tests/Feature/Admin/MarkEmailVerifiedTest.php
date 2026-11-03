@@ -314,6 +314,8 @@ it('filtra a listagem por e-mail verificado: sim e não', function () {
 // -----------------------------------------------------------------------------
 
 it('tem as mensagens da ação nos três idiomas', function (string $locale) {
+    requireLocales($locale);
+
     $chaves = [
         'email_verified', 'mark_email_verified', 'mark_email_verified_heading',
         'mark_email_verified_warning', 'mark_email_verified_confirm',

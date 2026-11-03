@@ -72,6 +72,8 @@ it('o 429 da web sai com os headers de segurança, Retry-After e página traduzi
 });
 
 it('a página 429 respeita o idioma do navegador (en/es) antes da sessão existir', function (string $acceptLanguage, string $expected, string $htmlLang) {
+    requireLocales('en', 'es');
+
     config()->set('security.rate_limit.web', 1);
 
     $this->withHeader('Accept-Language', $acceptLanguage)->get('/');
@@ -87,6 +89,8 @@ it('a página 429 respeita o idioma do navegador (en/es) antes da sessão existi
 ]);
 
 it('a página 429 respeita o cookie de idioma do visitante (cifrado) acima do navegador', function () {
+    requireLocales('en', 'es');
+
     config()->set('security.rate_limit.web', 1);
 
     $this->withCookie('locale', 'en')->withHeader('Accept-Language', 'es')->get('/');
@@ -97,6 +101,8 @@ it('a página 429 respeita o cookie de idioma do visitante (cifrado) acima do na
 });
 
 it('cookie de idioma adulterado (não cifrado pela aplicação) é ignorado', function () {
+    requireLocales('en', 'es');
+
     config()->set('security.rate_limit.web', 1);
 
     $this->withUnencryptedCookie('locale', 'en')->withHeader('Accept-Language', 'es')->get('/');

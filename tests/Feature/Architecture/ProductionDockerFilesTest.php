@@ -122,7 +122,7 @@ it('o nome do produto em produção é obrigatório, sem padrão do kit, e APP_N
         ->not->toContain('Starter Kit')
         ->not->toContain('PROD_PLATFORM_NAME:-');
 
-    // A cor da marca tem o mesmo padrão da config/platform.php: nenhum.
+    // A cor da marca tem o mesmo padrão da config/platform.php do kit: nenhum.
     expect($compose)->toContain('PLATFORM_PRIMARY_COLOR: ${PROD_PLATFORM_PRIMARY_COLOR:-}')
-        ->and(file_get_contents(config_path('platform.php')))->toContain("'primary_color' => env('PLATFORM_PRIMARY_COLOR'),");
+        ->and(file_get_contents(kitConfigFile('platform')))->toContain("'primary_color' => env('PLATFORM_PRIMARY_COLOR'),");
 });

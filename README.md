@@ -66,7 +66,7 @@ lugar.)
 
 ## No monorepo
 
-Como instalar, rodar e testar está no [README da raiz do repositório](https://github.com/kelvindk9w/tws-laravel-starter-kit/blob/desenvolvimento/README.md);
+Como instalar, rodar e testar está no [CONTRIBUTING.md da raiz do repositório](https://github.com/kelvindk9w/tws-laravel-starter-kit/blob/desenvolvimento/CONTRIBUTING.md#desenvolver-o-kit-o-monorepo);
 a documentação por assunto está em [`docs/`](https://github.com/kelvindk9w/tws-laravel-starter-kit/tree/desenvolvimento/docs). O ambiente de
 desenvolvimento (`docker-compose.yml`) fica na raiz do repositório, e os
 comandos `docker compose` funcionam também daqui de dentro.

@@ -14,6 +14,13 @@ use Twstec\Kit\Foundation\Localization\Middleware\SetLocale;
 // i18n: middleware SetLocale, rota de troca e preferência no perfil.
 // Prioridade: conta logada → cookie do visitante → padrão da plataforma.
 
+// O arquivo exercita a troca entre os três idiomas: projeto que apagou en/es
+// pula (o caso de um idioma só fica em SingleLocaleTest.php; a paridade das
+// chaves, em ProjectLocalesTest.php).
+beforeEach(function (): void {
+    requireLocales('en', 'es');
+});
+
 it('visitante sem cookie vê o padrão da plataforma (pt-BR)', function () {
     $this->get('/')
         ->assertOk()
@@ -200,24 +207,4 @@ it('preferredLocale cai no padrão da plataforma sem preferência válida', func
     expect(User::factory()->create(['locale' => null])->preferredLocale())->toBe(platform()->locale)
         ->and(User::factory()->create(['locale' => 'fr'])->preferredLocale())->toBe(platform()->locale)
         ->and(User::factory()->create(['locale' => 'en'])->preferredLocale())->toBe('en');
-});
-
-it('todos os idiomas disponíveis têm os mesmos arquivos e chaves do pt-BR', function () {
-    $reference = [];
-
-    foreach (glob(lang_path('pt_BR/*.php')) as $file) {
-        $reference[basename($file)] = collect(require $file)->dot()->keys()->sort()->values();
-    }
-
-    foreach (['en', 'es'] as $locale) {
-        foreach ($reference as $file => $keys) {
-            $path = lang_path("{$locale}/{$file}");
-
-            expect($path)->toBeFile();
-
-            $actual = collect(require $path)->dot()->keys()->sort()->values();
-
-            expect($actual->all())->toBe($keys->all(), "lang/{$locale}/{$file} diverge do pt-BR");
-        }
-    }
 });
