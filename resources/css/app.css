@@ -13,6 +13,8 @@
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+/* As telas do kit (twstec/kit-foundation): o Tailwind não lê o vendor/ sozinho. */
+@source '../../vendor/twstec/kit-foundation/resources/livewire';
 
 /* Tema claro/escuro por CLASSE (.dark no <html>) — toggle de 3 estados
    (sistema/claro/escuro) em resources/js/ui.js; anti-flash no <head>

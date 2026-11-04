@@ -12,6 +12,14 @@ Livewire, super admin em Filament, API v1, filas, backup e o deploy de
 produção em Docker (`docker-compose.prod.yml`). Composer:
 `twstec/starter-livewire` (projeto).
 
+**Telas do kit no pacote:** as views das telas do kit (entrada, segundo
+fator, perfil, contas, chaves de API, webhooks, layouts e componentes do
+design system) moram no `twstec/kit-foundation` (`resources/livewire`, com
+os nomes de view de sempre). O projeto tem só a página inicial e o dashboard
+e, para mudar uma tela ou um componente do kit, copia só aquele arquivo para
+o mesmo caminho em `resources/views` — o do aplicativo vence. Ver
+[docs/personalizacao.md](https://github.com/kelvindk9w/tws-laravel-starter-kit/blob/desenvolvimento/docs/personalizacao.md#telas-livewire).
+
 ## Criar um projeto
 
 Requisitos: PHP 8.4 (extensões `intl`, `bcmath`, `gd`, `pcntl`, `pdo_pgsql`

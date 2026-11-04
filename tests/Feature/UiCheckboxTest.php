@@ -53,7 +53,7 @@ it('caixa única de formulário: envia "1" com o nome dado', function () {
 });
 
 it('as telas usam a caixa em lista com valor próprio (chaves de API e webhooks)', function () {
-    $chaves = (string) file_get_contents(resource_path('views/livewire/api-keys/index.blade.php'));
+    $chaves = (string) file_get_contents(viewFile('livewire/api-keys/index.blade.php'));
 
     expect(substr_count($chaves, '<x-checkbox'))->toBe(3)
         ->and(substr_count($chaves, 'wire:model="selectedScopes"'))->toBe(1)

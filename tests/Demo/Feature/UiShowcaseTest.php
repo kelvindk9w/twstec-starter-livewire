@@ -102,7 +102,7 @@ it('componentes Blade do kit existem e renderizam', function (string $component,
 // =============================================================================
 
 it('snippets mostram o código INTEIRO (nada de truncate)', function () {
-    $snippet = (string) file_get_contents(resource_path('views/components/snippet.blade.php'));
+    $snippet = (string) file_get_contents(viewFile('components/snippet.blade.php'));
 
     // Numa página cujo propósito é mostrar código copiável, 100% do código
     // aparecia cortado no meio (`<x-input label="…" name="demo_na`).

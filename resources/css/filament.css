@@ -31,6 +31,7 @@
 @source '../../app/Filament';
 @source '../../app/Providers/Filament';
 @source '../../resources/views/filament';
+@source '../../vendor/twstec/kit-foundation/resources/livewire/filament';
 
 @theme {
     /* Corpo e títulos do /admin passam a falar a MESMA voz tipográfica do

@@ -72,9 +72,26 @@ function bladeViews(string $directory): array
 {
     $files = [];
 
-    foreach (Finder::create()->files()->in(base_path($directory))->name('*.blade.php') as $file) {
-        $files[$directory.'/'.$file->getRelativePathname()] = (string) file_get_contents($file->getRealPath());
+    // Em resources/views, valem também as telas do kit (twstec/kit-foundation,
+    // resources/livewire) que o aplicativo não sobrescreve: a regra alcança o
+    // que o projeto de fato renderiza.
+    $sources = [base_path($directory)];
+
+    if ($directory === 'resources/views' || str_starts_with($directory, 'resources/views/')) {
+        $sources[] = kitViewsPath(substr($directory, strlen('resources/views/')) ?: '');
     }
+
+    foreach ($sources as $source) {
+        if (! is_dir($source)) {
+            continue;
+        }
+
+        foreach (Finder::create()->files()->in($source)->name('*.blade.php') as $file) {
+            $files[$directory.'/'.$file->getRelativePathname()] ??= (string) file_get_contents($file->getPathname());
+        }
+    }
+
+    ksort($files);
 
     return $files;
 }
@@ -107,21 +124,21 @@ it('o esqueleto do site é montado com componentes do kit', function () {
     // compõe componentes do kit. (O apelido público da demonstração,
     // <x-layouts.landing>, é conferido do lado dela: tests/Demo, "o layout
     // público da demo…".)
-    $site = (string) file_get_contents(resource_path('views/components/layouts/site.blade.php'));
+    $site = (string) file_get_contents(viewFile('components/layouts/site.blade.php'));
 
     expect($site)->toContain('<x-site-header')
         ->and($site)->toContain('<x-site-footer')
         ->and($site)->toContain('<x-flash-toast');
 
     foreach (['layouts/app', 'layouts/auth'] as $layout) {
-        expect((string) file_get_contents(resource_path("views/{$layout}.blade.php")))
+        expect((string) file_get_contents(viewFile("{$layout}.blade.php")))
             ->toContain('<x-layouts.site');
     }
 
     // Nenhum layout escreve o próprio <header>/<footer> de site. (O <header>
     // de uma PÁGINA — o bloco de título do /ui — é conteúdo, não é chrome.)
     foreach (['layouts/app', 'layouts/auth'] as $layout) {
-        expect((string) file_get_contents(resource_path("views/{$layout}.blade.php")))
+        expect((string) file_get_contents(viewFile("{$layout}.blade.php")))
             ->not->toContain('<header')
             ->not->toContain('<footer');
     }
@@ -163,7 +180,7 @@ it('componentes do kit não fixam superfície com a escala do Tailwind', functio
     $violations = [];
 
     foreach ($componentes as $component) {
-        $contents = (string) file_get_contents(resource_path("views/components/{$component}.blade.php"));
+        $contents = (string) file_get_contents(viewFile("components/{$component}.blade.php"));
 
         if (preg_match('/dark:bg-gray-\d00/', $contents, $matches) === 1) {
             $violations[] = sprintf('components/%s.blade.php: "%s" — use bg-surface/bg-surface-raised', $component, $matches[0]);

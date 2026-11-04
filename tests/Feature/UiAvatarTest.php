@@ -81,7 +81,7 @@ it('o showcase documenta o avatar e o menu lateral', function () {
 it('o painel só usa componentes do kit: o avatar do perfil é o do cabeçalho', function () {
     // O perfil desenhava a própria bolinha (bg-brand + 1 letra) enquanto o
     // cabeçalho desenhava outra. Duas verdades sobre a mesma pessoa.
-    expect((string) file_get_contents(resource_path('views/livewire/profile.blade.php')))
+    expect((string) file_get_contents(viewFile('livewire/profile.blade.php')))
         ->toContain('<x-avatar')
         ->not->toContain('rounded-full bg-brand');
 });

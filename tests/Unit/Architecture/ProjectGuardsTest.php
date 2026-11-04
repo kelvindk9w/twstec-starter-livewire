@@ -31,7 +31,7 @@ const PROJECT_STRICT_DIRECTORIES = ['app', 'database', 'routes'];
 /**
  * Pastas onde env() não pode aparecer (config/ é o ÚNICO lugar).
  */
-const PROJECT_NO_ENV_DIRECTORIES = ['app', 'bootstrap', 'database', 'routes', 'resources/views'];
+const PROJECT_NO_ENV_DIRECTORIES = ['app', 'bootstrap', 'database', 'routes', 'resources/views', 'vendor/twstec/kit-foundation/resources/livewire'];
 
 /**
  * Pastas que não conhecem interface.

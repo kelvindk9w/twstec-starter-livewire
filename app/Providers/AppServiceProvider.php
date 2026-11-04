@@ -9,6 +9,7 @@ use App\Providers\Filament\AdminPanelProvider;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use Twstec\Kit\Auth\Http\Middleware\EnsureEmailIsVerified;
+use Twstec\Kit\Foundation\Customization\LivewireScreens;
 use Twstec\Kit\Foundation\Kit;
 
 class AppServiceProvider extends ServiceProvider
@@ -27,6 +28,12 @@ class AppServiceProvider extends ServiceProvider
         // Links do site acrescentados por extensões (cabeçalho e rodapé
         // públicos — ver SiteLinks). Um por aplicação: nada vaza entre testes.
         $this->app->singleton(SiteLinks::class);
+
+        // As telas do kit (entrada, perfil, contas, chaves de API, layouts,
+        // componentes do design system…) vêm do twstec/kit-foundation
+        // (resources/livewire), com os nomes de view de sempre. O arquivo de
+        // mesmo caminho em resources/views vale no lugar do pacote.
+        LivewireScreens::register($this->app);
 
         // O painel /admin é OPCIONAL (twstec/kit-admin, que traz o Filament):
         // o PanelProvider do aplicativo só é registrado com o pacote

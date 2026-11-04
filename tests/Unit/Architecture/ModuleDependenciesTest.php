@@ -638,7 +638,7 @@ it('usa os nomes novos das classes de autenticação, nunca os apelidos App\\Cor
     }
 
     // Nas views Blade, que não são PHP puro, vale o nome escrito.
-    foreach ((new Finder)->files()->in(base_path('resources/views'))->name('*.blade.php') as $file) {
+    foreach ((new Finder)->files()->in(viewDirectories())->name('*.blade.php') as $file) {
         if (preg_match('/App\\\\+Core\\\\+Auth\\\\+/', $file->getContents()) === 1) {
             $violations[] = str_replace(base_path().'/', '', $file->getRealPath()).' usa App\\Core\\Auth';
         }
@@ -680,7 +680,7 @@ it('usa os nomes novos das classes de contas e API, nunca os apelidos App\\Core\
     }
 
     // Nas views Blade, que não são PHP puro, vale o nome escrito.
-    foreach ((new Finder)->files()->in(base_path('resources/views'))->name('*.blade.php') as $file) {
+    foreach ((new Finder)->files()->in(viewDirectories())->name('*.blade.php') as $file) {
         if (preg_match('/App\\\\+Core\\\\+('.implode('|', ACCOUNTS_MOVED_MODULES).')\\\\+/', $file->getContents()) === 1) {
             $violations[] = str_replace(base_path().'/', '', $file->getRealPath()).' usa App\\Core\\Tenancy ou App\\Core\\ApiKeys';
         }
@@ -722,7 +722,7 @@ it('usa os nomes novos das classes de uploads, nunca os apelidos App\\Core\\Uplo
     }
 
     // Nas views Blade, que não são PHP puro, vale o nome escrito.
-    foreach ((new Finder)->files()->in(base_path('resources/views'))->name('*.blade.php') as $file) {
+    foreach ((new Finder)->files()->in(viewDirectories())->name('*.blade.php') as $file) {
         if (preg_match('/App\\\\+Core\\\\+('.implode('|', UPLOADS_MOVED_MODULES).')\\\\+/', $file->getContents()) === 1) {
             $violations[] = str_replace(base_path().'/', '', $file->getRealPath()).' usa App\\Core\\Uploads';
         }
@@ -765,7 +765,7 @@ it('usa os nomes novos das classes do painel /admin, nunca os apelidos App\\Fila
     }
 
     // Nas views Blade, que não são PHP puro, vale o nome escrito.
-    foreach ((new Finder)->files()->in(base_path('resources/views'))->name('*.blade.php') as $file) {
+    foreach ((new Finder)->files()->in(viewDirectories())->name('*.blade.php') as $file) {
         foreach ($antigos as $antigo) {
             if (str_contains(str_replace('\\\\', '\\', $file->getContents()), $antigo)) {
                 $violations[] = str_replace(base_path().'/', '', $file->getRealPath()).' usa '.$antigo;

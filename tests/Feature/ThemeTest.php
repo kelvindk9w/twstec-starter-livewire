@@ -91,7 +91,7 @@ it('rota de preferência de tema exige login', function () {
 // =============================================================================
 
 it('o toggle ligado usa cor de ESTADO, nunca a cor da marca', function () {
-    $toggle = (string) file_get_contents(resource_path('views/components/toggle.blade.php'));
+    $toggle = (string) file_get_contents(viewFile('components/toggle.blade.php'));
 
     expect($toggle)->toContain('peer-checked:bg-success')
         ->and($toggle)->not->toContain('peer-checked:bg-brand')

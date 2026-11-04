@@ -134,3 +134,38 @@ function kitConfigFile(string $key): string
 
     return $file;
 }
+
+/*
+ * As telas Blade do kit moram no twstec/kit-foundation (resources/livewire),
+ * com os nomes de view de sempre; o aplicativo vence (o mesmo caminho em
+ * resources/views vale no lugar do pacote — LivewireScreens).
+ */
+function kitViewsPath(string $relative = ''): string
+{
+    return base_path('vendor/twstec/kit-foundation/resources/livewire'.($relative === '' ? '' : '/'.$relative));
+}
+
+/*
+ * O arquivo de view que vale para `$relative` (components/toggle.blade.php…):
+ * o do aplicativo, se existir; senão, o do kit.
+ */
+function viewFile(string $relative): string
+{
+    foreach ([resource_path('views/'.$relative), kitViewsPath($relative)] as $file) {
+        if (is_file($file)) {
+            return $file;
+        }
+    }
+
+    throw new LogicException("Nenhuma view em {$relative} (nem no aplicativo, nem no kit).");
+}
+
+/*
+ * As pastas de views que valem: a do aplicativo e a das telas do kit.
+ *
+ * @return list<string>
+ */
+function viewDirectories(): array
+{
+    return array_values(array_filter([resource_path('views'), kitViewsPath()], is_dir(...)));
+}

@@ -124,7 +124,7 @@ it('alvos de toque do painel têm no mínimo 44px no mobile', function () {
     $componentes = ['button', 'checkbox', 'toggle', 'dropdown-item'];
 
     foreach ($componentes as $component) {
-        expect((string) file_get_contents(resource_path("views/components/{$component}.blade.php")))
+        expect((string) file_get_contents(viewFile("components/{$component}.blade.php")))
             ->toContain('min-h-11');
     }
 
