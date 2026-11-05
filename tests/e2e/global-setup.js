@@ -2,7 +2,7 @@ import { chromium, request as requestFactory } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { adminState, signInToAdmin } from './support/admin.js';
 import { signInToPanel } from './support/flows.js';
-import { installed, isolationProblem, mailpitBaseUrl, userEmail, userPassword } from './support/project-env.js';
+import { installed, isolationProblem, mailpitBaseUrl, mailpitProblem, userEmail, userPassword } from './support/project-env.js';
 
 // =============================================================================
 // Global setup E2E: autentica UMA vez e grava o storageState reutilizado
@@ -11,7 +11,8 @@ import { installed, isolationProblem, mailpitBaseUrl, userEmail, userPassword } 
 // login por teste estouraria o limite e invalidaria a suíte.
 //
 // ANTES DE TUDO, a trava de isolamento (support/project-env.js): o site que
-// responde tem de ser ESTE projeto, e o Mailpit o dele — senão a suíte para
+// responde tem de ser ESTE projeto (cookie de sessão), e o Mailpit o dele
+// (rótulo) — inclusive com E2E_BASE_URL/E2E_MAILPIT_URL. Senão a suíte para
 // sem criar nem apagar nada.
 //
 // Duas sessões:
@@ -31,7 +32,7 @@ function refuse(problem) {
 
 export default async function globalSetup(config) {
     const baseURL = config.projects[0].use.baseURL;
-    const configured = isolationProblem(String(baseURL), mailpitBaseUrl, null);
+    const configured = isolationProblem(String(baseURL), mailpitBaseUrl, null) ?? (await mailpitProblem(mailpitBaseUrl));
 
     if (configured !== null) {
         refuse(configured);

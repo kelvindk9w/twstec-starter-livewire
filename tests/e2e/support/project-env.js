@@ -104,11 +104,17 @@ export const installed = (module) => installedPackages.has(`twstec/kit-${module}
 export const demoInstalled = installed('demo');
 
 /**
- * A trava de isolamento, antes de qualquer teste criar ou apagar algo: num
- * projeto com o Docker de desenvolvimento, sem endereço explícito, o E2E
- * tem de estar apontado para o site e o Mailpit DESTE .env — e o site que
- * responde tem de ser este projeto (o cookie de sessão tem o nome dele).
- * Devolve o motivo da recusa, ou null.
+ * A trava de isolamento, antes de qualquer teste criar ou apagar algo — num
+ * projeto com o Docker de desenvolvimento (o .env tem COMPOSE_PROJECT_NAME):
+ *
+ * - sem endereço explícito, o E2E tem de estar apontado para o site e o
+ *   Mailpit DESTE .env (APP_URL, DEV_MAIL_PORT);
+ * - SEMPRE, inclusive com E2E_BASE_URL: o site que responde tem de ser este
+ *   projeto — o cookie de sessão tem o nome do SESSION_COOKIE do .env
+ *   (`cookieNames`: null = ainda não abriu o site).
+ *
+ * O Mailpit é conferido à parte (mailpitProblem), pelo rótulo. Devolve o
+ * motivo da recusa, ou null.
  */
 export function isolationProblem(resolvedBaseUrl, resolvedMailpitUrl, cookieNames) {
     if (!dockerProject) {
@@ -123,8 +129,39 @@ export function isolationProblem(resolvedBaseUrl, resolvedMailpitUrl, cookieName
         return `o E2E lê o Mailpit em ${resolvedMailpitUrl}, mas o deste projeto está na porta ${dotEnv.DEV_MAIL_PORT} (DEV_MAIL_PORT do .env)`;
     }
 
-    if (!process.env.E2E_BASE_URL && cookieNames !== null && dotEnv.SESSION_COOKIE && !cookieNames.includes(dotEnv.SESSION_COOKIE)) {
+    if (cookieNames !== null && dotEnv.SESSION_COOKIE && !cookieNames.includes(dotEnv.SESSION_COOKIE)) {
         return `o site em ${resolvedBaseUrl} não é este projeto: ele não devolveu o cookie de sessão ${dotEnv.SESSION_COOKIE} (SESSION_COOKIE do .env), e sim ${cookieNames.join(', ') || 'nenhum'}`;
+    }
+
+    return null;
+}
+
+/**
+ * O Mailpit que responde é o DESTE projeto? A porta não prova (com vários
+ * projetos na máquina, a de outro pode estar no endereço): o compose.yaml dá
+ * ao Mailpit o rótulo do projeto (MP_LABEL = COMPOSE_PROJECT_NAME), e o E2E
+ * só lê e apaga mensagens numa caixa com esse rótulo — inclusive com
+ * E2E_MAILPIT_URL. Falha fechada: Mailpit fora do ar, sem rótulo ou com o de
+ * outro projeto é recusa. Devolve o motivo, ou null.
+ */
+export async function mailpitProblem(resolvedMailpitUrl) {
+    if (!dockerProject) {
+        return null;
+    }
+
+    const expected = dotEnv.COMPOSE_PROJECT_NAME;
+    let label;
+
+    try {
+        const response = await fetch(`${resolvedMailpitUrl}/api/v1/webui`);
+        const settings = await response.json();
+        label = settings.Label;
+    } catch {
+        return `o Mailpit em ${resolvedMailpitUrl} não respondeu (/api/v1/webui) — sem ele não dá para conferir de qual projeto é a caixa`;
+    }
+
+    if (label !== expected) {
+        return `o Mailpit em ${resolvedMailpitUrl} não é deste projeto: o rótulo dele é "${typeof label === 'string' ? label : ''}", e o deste projeto é "${expected}" (COMPOSE_PROJECT_NAME do .env; o compose.yaml dá ao Mailpit MP_LABEL: '\${COMPOSE_PROJECT_NAME}')`;
     }
 
     return null;

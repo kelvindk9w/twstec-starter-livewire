@@ -4,14 +4,17 @@
 # máquina, pelo Docker de desenvolvimento do projeto (sem PHP nem Node
 # instalados):
 #
-#   1. estilo (Pint)
-#   2. análise estática (Larastan nível 8, sem baseline — o
+#   1. segredos (gitleaks — scripts/segredos: o histórico do git inteiro e o
+#      que ainda não foi commitado; libera só os valores do .gitleaks.toml)
+#   2. estilo (Pint)
+#   3. análise estática (Larastan nível 8, sem baseline — o
 #      phpstan.modules.php tira da análise as telas de módulo não instalado)
-#   3. auditoria de dependências PHP (composer audit)
-#   4. auditoria de dependências Node (npm audit, só as de produção, alta+)
-#   5. build do front
-#   6. a suíte Pest contra o PostgreSQL (o banco <banco>_test do
-#      phpunit.pgsql.xml, que o serviço db-init cria)
+#   4. auditoria de dependências PHP (composer audit)
+#   5. auditoria de dependências Node (npm audit, só as de produção, alta+)
+#   6. build do front
+#   7. a suíte Pest contra o PostgreSQL (o banco <banco>_test do
+#      phpunit.pgsql.xml, que o serviço db-init cria); no projeto criado com
+#      SQLite (sem o serviço postgres no compose), no SQLite do phpunit.xml
 #
 # Uso, na raiz do projeto:   scripts/verificar
 # (No Windows, no terminal do WSL ou no Git Bash; ou rode os mesmos comandos
@@ -64,6 +67,9 @@ if [ "$SELO" = 1 ]; then
     INICIO=$(date +%s)
 fi
 
+passo 'Segredos (gitleaks)'
+scripts/segredos
+
 passo 'Estilo (Pint)'
 docker compose run --rm --no-deps -T app ./vendor/bin/pint --test
 
@@ -79,10 +85,17 @@ docker compose run --rm --no-deps -T vite sh -ec '[ -d node_modules ] || npm ci 
 passo 'Build do front'
 docker compose run --rm --no-deps -T vite npm run build
 
-passo 'Testes (Pest · PostgreSQL)'
-docker compose up -d --wait postgres
-docker compose run --rm -T db-init
-docker compose run --rm --no-deps -T app ./vendor/bin/pest --ci -c phpunit.pgsql.xml
+if docker compose config --services | grep -qx postgres; then
+    passo 'Testes (Pest · PostgreSQL)'
+    docker compose up -d --wait postgres
+    docker compose run --rm -T db-init
+    docker compose run --rm --no-deps -T app ./vendor/bin/pest --ci -c phpunit.pgsql.xml
+else
+    # Projeto criado com SQLite (modo protótipo): sem o serviço do banco, a
+    # suíte roda no SQLite em memória do phpunit.xml.
+    passo 'Testes (Pest · SQLite)'
+    docker compose run --rm --no-deps -T app ./vendor/bin/pest --ci
+fi
 
 if [ "$E2E" = 1 ]; then
     passo 'E2E (scripts/e2e)'
@@ -97,5 +110,5 @@ if [ "$SELO" = 1 ]; then
     selo_arvore_limpa || { selo_erro 'a árvore ficou suja durante a verificação (algum passo mudou arquivo versionado): nada publicado.'; git status --short | head -n 20 >&2; exit 1; }
     SEGUNDOS=$(($(date +%s) - INICIO))
     if [ "$E2E" = 1 ]; then COM_E2E=sim; else COM_E2E=não; fi
-    selo_publicar "$VERIFICADO" "$(printf 'OK em %dm%02ds · %s · pint larastan audits build pest' $((SEGUNDOS / 60)) $((SEGUNDOS % 60)) "E2E: $COM_E2E")"
+    selo_publicar "$VERIFICADO" "$(printf 'OK em %dm%02ds · %s · segredos pint larastan audits build pest' $((SEGUNDOS / 60)) $((SEGUNDOS % 60)) "E2E: $COM_E2E")"
 fi

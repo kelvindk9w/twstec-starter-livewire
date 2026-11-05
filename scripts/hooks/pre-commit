@@ -1,0 +1,20 @@
+#!/bin/sh
+# =============================================================================
+# Hook pre-commit — ligado SÓ por scripts/instalar-hooks (desligado por padrão).
+#
+# Recusa o commit se o gitleaks achar segredo no que está STAGED
+# (scripts/segredos --staged, em container). Sem o Docker não há como
+# conferir: o commit é recusado, com a instrução.
+#
+# Valor fictício de teste: libere pelo valor exato no .gitleaks.toml, com o
+# motivo. O `git commit --no-verify` pula este hook — não use para passar um
+# achado: o scripts/verificar e o CI varrem o histórico inteiro e falham do
+# mesmo jeito.
+# =============================================================================
+set -eu
+
+RAIZ=$(git rev-parse --show-toplevel)
+if ! "$RAIZ/scripts/segredos" --staged; then
+    echo 'commit recusado: possível segredo no que está staged (acima). Tire o valor do arquivo; se for fictício de teste, libere-o pelo valor exato no .gitleaks.toml. Segredo que já saiu da máquina: rotacione.' >&2
+    exit 1
+fi

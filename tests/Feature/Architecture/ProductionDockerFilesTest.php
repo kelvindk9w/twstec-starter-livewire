@@ -13,7 +13,8 @@ declare(strict_types=1);
 // - o public/ é SINCRONIZADO no volume do nginx (o que sobrou da versão
 //   anterior sai), e falha ali para a subida;
 // - Redis, app e nginx têm healthcheck, e quem depende deles espera o
-//   "pronto", não só o "iniciado".
+//   "pronto", não só o "iniciado" (projeto criado sem Redis: sem redis e
+//   horizon, com o worker `queue`).
 // =============================================================================
 
 function productionFile(string $path): string
@@ -84,6 +85,30 @@ it('Redis, app e nginx de produção têm healthcheck, e quem depende deles espe
         if ($current !== null) {
             $service[$current] .= $line."\n";
         }
+    }
+
+    // Projeto criado sem Redis: sem os serviços redis e horizon; a fila é o
+    // worker `queue` (queue:work), que espera o app pronto.
+    if (! array_key_exists('redis', $service)) {
+        expect(array_keys($service))->toContain('app', 'nginx', 'queue', 'scheduler')
+            ->not->toContain('horizon')
+            // Fora dos comentários, nada de Redis nem do Horizon.
+            ->and((string) preg_replace('/^\s*#.*$/m', '', $compose))->not->toMatch('/redis|horizon/i')
+            ->and($service['queue'])->toContain('php artisan queue:work')
+            ->toMatch('/app:\s+condition: service_healthy/');
+
+        foreach (['app', 'nginx', 'postgres'] as $name) {
+            expect($service[$name])->toContain('healthcheck:');
+        }
+
+        foreach (['app', 'nginx', 'queue', 'scheduler'] as $name) {
+            expect($service[$name])->not->toMatch('/^\s+- app$/m')
+                ->not->toMatch('/app:\s+condition: service_started/');
+        }
+
+        expect($service['nginx'])->toMatch('/app:\s+condition: service_healthy/');
+
+        return;
     }
 
     expect(array_keys($service))->toContain('app', 'nginx', 'redis', 'horizon', 'scheduler');

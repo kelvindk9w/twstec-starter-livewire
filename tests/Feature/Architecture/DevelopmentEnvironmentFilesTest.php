@@ -19,7 +19,10 @@ declare(strict_types=1);
 // - o Dependabot modelo: os cinco ecossistemas nos caminhos do projeto e os
 //   pacotes do kit (twstec/*) num grupo próprio;
 // - a verificação local com selo (opcional): os scripts existem, são
-//   executáveis e o pre-push só vale depois do scripts/instalar-hooks.
+//   executáveis e o pre-push só vale depois do scripts/instalar-hooks;
+// - a varredura de segredos (gitleaks, imagem fixada por digest) no
+//   scripts/verificar, no CI base (com o histórico inteiro) e no pre-commit,
+//   e o .gitleaks.toml liberando só valores exatos (nunca pasta nem regra).
 //
 // No repositório do kit, o compose, o CI e o Dependabot ficam em docker/dev/;
 // no projeto criado, em compose.yaml, .github/workflows/ci.yml e
@@ -42,6 +45,10 @@ it('o Vite de desenvolvimento libera no CORS só a origem do site', function ():
 });
 
 it('o banco da suíte PostgreSQL do db-init é <DB_DATABASE>_test', function (): void {
+    if (! developmentPostgres()) {
+        test()->markTestSkipped('Projeto criado com SQLite: sem o PostgreSQL nem o db-init no compose.');
+    }
+
     $compose = developmentFile('compose.yaml', 'docker/dev/compose.yaml');
 
     expect($compose)->toContain("datname = '\${DB_DATABASE}_test'")
@@ -213,4 +220,63 @@ it('a análise estática enxerga as colunas e os casts dos models do kit pelas e
     // Com as extensões, o Larastan não lê mais sozinho as migrations do
     // projeto: elas ficam listadas no phpstan.neon.dist.
     expect($phpstan)->toMatch('/^\s+databaseMigrationsPath:\n\s+- database\/migrations$/m');
+});
+
+it('a varredura de segredos: gitleaks fixado por digest no verificar, no CI base e no pre-commit', function (): void {
+    foreach (['scripts/segredos', 'scripts/hooks/pre-commit'] as $script) {
+        expect(is_executable(base_path($script)))->toBeTrue("{$script} não é executável");
+
+        exec('sh -n '.escapeshellarg(base_path($script)).' 2>&1', $output, $code);
+        expect($code)->toBe(0, "{$script}: ".implode("\n", $output));
+    }
+
+    $segredos = (string) file_get_contents(base_path('scripts/segredos'));
+    $verificar = (string) file_get_contents(base_path('scripts/verificar'));
+    $ci = developmentFile('.github/workflows/ci.yml', 'docker/dev/ci.yml');
+
+    // A imagem oficial, fixada pela versão E pelo digest; o histórico
+    // inteiro e o que ainda não foi commitado; o achado sai oculto.
+    expect($segredos)->toMatch('/^GITLEAKS_IMAGE=ghcr\.io\/gitleaks\/gitleaks:v\d+\.\d+\.\d+@sha256:[0-9a-f]{64}$/m')
+        ->toContain('gitleaks git /repo')
+        ->toContain('gitleaks git --pre-commit --staged /repo')
+        ->toContain('gitleaks git --pre-commit /repo')
+        ->toContain('--redact');
+
+    // Primeiro passo do verificar e do CI (antes do Pint); o CI traz o
+    // histórico inteiro (sem fetch-depth: 0, o checkout traz só o último
+    // commit).
+    expect($verificar)->toContain("passo 'Segredos (gitleaks)'\nscripts/segredos\n")
+        ->and(strpos($verificar, 'scripts/segredos'))->toBeLessThan(strpos($verificar, './vendor/bin/pint'))
+        ->and($ci)->toContain("fetch-depth: 0\n")
+        ->toContain("run: scripts/segredos\n")
+        ->and(strpos($ci, 'run: scripts/segredos'))->toBeLessThan(strpos($ci, './vendor/bin/pint'));
+
+    // O pre-commit só no staged, ligado pelo instalar-hooks (que o deixa
+    // executável).
+    expect((string) file_get_contents(base_path('scripts/hooks/pre-commit')))->toContain('scripts/segredos" --staged')
+        ->and((string) file_get_contents(base_path('scripts/instalar-hooks')))->toContain('scripts/hooks/pre-commit scripts/segredos');
+});
+
+it('o .gitleaks.toml parte das regras padrão e libera só valores exatos, nunca pasta nem regra', function (): void {
+    $config = (string) file_get_contents(base_path('.gitleaks.toml'));
+
+    expect($config)->toMatch('/^\[extend\]\nuseDefault = true$/m')
+        ->not->toMatch('/^\s*(paths|commits|stopwords|disabledRules)\s*=/m')
+        ->not->toMatch('/^\s*\[\[?rules/m')
+        ->not->toMatch('/^\s*\[allowlist\]/m');
+
+    preg_match_all('/^\[\[allowlists\]\]\n((?:(?!^\[).*\n?)*)/m', $config, $blocks);
+    expect($blocks[1])->not->toBeEmpty();
+
+    foreach ($blocks[1] as $block) {
+        expect($block)->toMatch('/^description = "[^"]{20,}"$/m')
+            ->toMatch('/^regexTarget = "secret"$/m');
+    }
+
+    preg_match_all("/'''(.*?)'''/", $config, $values);
+    expect($values[1])->not->toBeEmpty();
+
+    foreach ($values[1] as $value) {
+        expect($value)->toMatch('/^\^[A-Za-z0-9_-]+\$$/', "valor liberado sem âncoras ou com padrão: {$value}");
+    }
 });

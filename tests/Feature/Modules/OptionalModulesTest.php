@@ -250,6 +250,8 @@ it('sem uploads, o perfil não tem a foto e a ação de enviar não existe', fun
 });
 
 it('sem o /admin, o /horizon fecha até para quem é admin (não há o critério do painel)', function (): void {
+    requireHorizon();
+
     $admin = User::factory()->create(['is_admin' => true]);
 
     Kit::pretendAbsent('admin');

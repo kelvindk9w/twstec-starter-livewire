@@ -23,6 +23,7 @@
 .gitattributes
 .gitignore
 .editorconfig
+.gitleaks.toml
 
 # Ambiente e segredos: TODO arquivo de ambiente, sem exceção
 .env

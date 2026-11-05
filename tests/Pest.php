@@ -120,6 +120,41 @@ function requireLocales(string ...$locales): void
 }
 
 /*
+ * O projeto tem o Horizon? Sem Redis (escolha da criação — o tws:install tira
+ * o pacote), a fila é o `queue:work` e não existe o /horizon.
+ */
+function horizonInstalled(): bool
+{
+    return class_exists('Laravel\\Horizon\\Horizon');
+}
+
+/*
+ * O teste é do Horizon: sem ele (projeto criado sem Redis), PULA, com o motivo.
+ */
+function requireHorizon(): void
+{
+    if (! horizonInstalled()) {
+        test()->markTestSkipped('O Horizon não está neste projeto (criado sem Redis).');
+    }
+}
+
+/*
+ * O compose de desenvolvimento tem o serviço do PostgreSQL? Sem ele (projeto
+ * criado com SQLite, o modo protótipo), não há db-init nem a suíte no
+ * PostgreSQL.
+ */
+function developmentPostgres(): bool
+{
+    foreach ([base_path('compose.yaml'), base_path('docker/dev/compose.yaml')] as $file) {
+        if (is_file($file)) {
+            return preg_match('/^ +postgres:\s*$/m', (string) file_get_contents($file)) === 1;
+        }
+    }
+
+    return true;
+}
+
+/*
  * O arquivo com o padrão do kit para a configuração `$key` (o config/ de um
  * pacote twstec/kit-*). O projeto não tem cópia: só tem config/<arquivo>.php
  * se mudar algo (Twstec\Kit\Foundation\Customization\PackageConfig).

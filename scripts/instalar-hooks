@@ -5,7 +5,8 @@
 #
 # Aponta o `core.hooksPath` do git para scripts/hooks (versionados): o
 # pre-push passa a recusar enviar commit sem o selo `verificacao-local` do
-# `scripts/verificar --selo`. Idempotente. Os hooks acompanham o repositório
+# `scripts/verificar --selo`, e o pre-commit a recusar commit com possível
+# segredo no que está staged (scripts/segredos --staged). Idempotente. Os hooks acompanham o repositório
 # (atualizou a branch, atualizou o hook).
 #
 #   scripts/instalar-hooks              liga
@@ -35,7 +36,7 @@ case "${1:-}" in
     *) echo "scripts/instalar-hooks: opção desconhecida: $1" >&2; exit 2 ;;
 esac
 
-chmod +x scripts/hooks/pre-push scripts/verificar scripts/promover scripts/e2e scripts/instalar-hooks
+chmod +x scripts/hooks/pre-push scripts/hooks/pre-commit scripts/segredos scripts/verificar scripts/promover scripts/e2e scripts/instalar-hooks
 
 if [ "$ATUAL" = scripts/hooks ]; then
     echo 'Hooks já instalados (core.hooksPath = scripts/hooks).'
@@ -51,4 +52,5 @@ if [ -n "$ANTIGOS" ]; then echo "Aviso: estes hooks de .git/hooks não rodam mai
 for programa in docker gh; do
     command -v "$programa" >/dev/null 2>&1 || echo "Aviso: '$programa' não encontrado — o pre-push recusa o push sem ele."
 done
+echo '  pre-commit: recusa commit com possível segredo no que está staged (gitleaks, pelo Docker)'
 echo '  pre-push: exige o selo verificacao-local (rode scripts/verificar --selo antes do push)'

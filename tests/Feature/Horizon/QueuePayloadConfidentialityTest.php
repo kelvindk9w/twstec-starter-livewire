@@ -133,6 +133,8 @@ it('a tabela failed_jobs é podada diariamente na janela configurada', function 
 });
 
 it('a retenção do Horizon é finita e a de job falho acompanha a da failed_jobs', function (): void {
+    requireHorizon();
+
     $trim = config('horizon.trim');
 
     expect($trim['completed'])->toBe(60)
@@ -154,14 +156,20 @@ dataset('rotas da api do horizon', [
 ]);
 
 it('a API do Horizon recusa visitante sem sessão', function (string $rota): void {
+    requireHorizon();
+
     $this->getJson($rota)->assertForbidden();
 })->with('rotas da api do horizon');
 
 it('a API do Horizon recusa usuário comum', function (string $rota): void {
+    requireHorizon();
+
     $this->actingAs(User::factory()->create())->getJson($rota)->assertForbidden();
 })->with('rotas da api do horizon');
 
 it('a API do Horizon recusa admin com a conta desativada', function (string $rota, UserStatus $status): void {
+    requireHorizon();
+
     $admin = User::factory()->create(['is_admin' => true, 'status' => $status]);
 
     // 401 ou 403 conforme a camada que recusa primeiro: a conta inativa é
@@ -177,6 +185,8 @@ it('a API do Horizon recusa admin com a conta desativada', function (string $rot
 ]);
 
 it('a API do Horizon recusa admin ativo fora da allowlist de IP', function (string $rota): void {
+    requireHorizon();
+
     config(['security.admin.allowed_ips' => ['10.10.10.10']]);
 
     $admin = User::factory()->create(['is_admin' => true]);

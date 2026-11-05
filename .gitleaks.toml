@@ -1,0 +1,52 @@
+# Configuração do gitleaks (varredura de segredos) — usada pelo
+# scripts/segredos: no scripts/verificar, no hook pre-commit e no CI.
+#
+# Parte das regras padrão do gitleaks e libera SÓ os valores fictícios dos
+# testes do kit, pelo VALOR EXATO: um segredo de verdade colado num teste
+# continua sendo barrado. Para liberar outro valor fictício, acrescente-o
+# aqui (âncoras ^ e $), com o motivo — nunca por pasta, arquivo ou regra
+# inteira.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Senhas fictícias dos testes do kit (Pest e E2E): usuários criados só na suíte, nunca fora dela"
+regexTarget = "secret"
+regexes = [
+    '''^SenhaForte123$''',
+    '''^SenhaAtual123$''',
+    '''^NovaSenhaForte456$''',
+    '''^Senha-Forte123$''',
+    '''^SenhaAntiga123$''',
+    '''^SenhaNova12345$''',
+    '''^Nova4Senha9Tx$''',
+    '''^Outra-senha-123$''',
+    '''^Nova-Senha456$''',
+    '''^OutraSenha789$''',
+    '''^Outra-Senha456$''',
+    '''^Senha-normal-123$''',
+    '''^Outra-Senha123$''',
+    '''^OutraSenha123$''',
+    '''^OutraSenha456$''',
+    '''^senha-longa-e-propria-9f2c$''',
+    '''^outra-senha-propria-4b71$''',
+]
+
+[[allowlists]]
+description = "Chaves de idempotência fictícias dos testes do kit: a Idempotency-Key é um identificador escolhido pelo cliente, não um segredo"
+regexTarget = "secret"
+regexes = [
+    '''^pedido-sessao-0001-abcdef$''',
+    '''^pedido-sessao-0002-abcdef$''',
+    '''^pedido-concorrente-0001-abcdef$''',
+]
+
+[[allowlists]]
+description = "Credenciais fictícias dos testes do kit (pepper, token e chave de PSP de mentira): só exercitam a validação, não abrem nada"
+regexTarget = "secret"
+regexes = [
+    '''^pepper-dedicado-a1b2c3$''',
+    '''^tok_live_123456$''',
+    '''^sk_test_secretaerrada$''',
+]

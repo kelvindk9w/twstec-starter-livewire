@@ -60,6 +60,8 @@ it('produção sem allowlist RECUSA o /admin, mesmo para admin ativo', function 
 });
 
 it('produção sem allowlist RECUSA o /horizon, mesmo para admin ativo', function (): void {
+    requireHorizon();
+
     $admin = User::factory()->create(['is_admin' => true]);
 
     simulaProducaoAdmin();
@@ -104,7 +106,10 @@ it('ADMIN_ALLOW_ANY_IP libera o /admin e o /horizon em produção', function ():
     config()->set('security.admin.allow_any_ip', true);
 
     $this->actingAs($admin)->get('/admin')->assertOk();
-    $this->actingAs($admin)->get('/horizon')->assertOk();
+
+    if (horizonInstalled()) {
+        $this->actingAs($admin)->get('/horizon')->assertOk();
+    }
 });
 
 it('o opt-out é reconhecido como decisão explícita, para o aviso do log', function (): void {
@@ -239,7 +244,10 @@ it('fora de produção a lista vazia continua liberando', function (): void {
         ->and(AdminIpAllowlist::missingInProduction())->toBeFalse();
 
     $this->actingAs($admin)->get('/admin')->assertOk();
-    $this->actingAs($admin)->get('/horizon')->assertOk();
+
+    if (horizonInstalled()) {
+        $this->actingAs($admin)->get('/horizon')->assertOk();
+    }
 });
 
 it('fora de produção a lista preenchida continua sendo obedecida', function (): void {
@@ -273,6 +281,8 @@ it('os downloads de export/import do Filament estão atrás da barreira de orige
 // -----------------------------------------------------------------------------
 
 it('admin desativado com sessão viva perde o /horizon, não só o /admin', function (UserStatus $status): void {
+    requireHorizon();
+
     // O gate do Horizon olhava apenas is_admin. Bloquear a conta tirava o
     // /admin (o Filament consulta canAccessPanel a cada requisição) e NÃO
     // tirava o /horizon: com a sessão ainda viva, o administrador recém
@@ -294,6 +304,8 @@ it('admin desativado com sessão viva perde o /horizon, não só o /admin', func
 ]);
 
 it('o gate viewHorizon exige is_admin E conta ativa', function (): void {
+    requireHorizon();
+
     $ativo = User::factory()->create(['is_admin' => true]);
     $bloqueado = User::factory()->create(['is_admin' => true, 'status' => UserStatus::Blocked]);
     $comum = User::factory()->create();
@@ -304,6 +316,8 @@ it('o gate viewHorizon exige is_admin E conta ativa', function (): void {
 });
 
 it('o Authenticate do Horizon está declarado no grupo de rotas, não só no vendor', function (): void {
+    requireHorizon();
+
     // A autorização do dashboard dependia de o pacote aplicar o middleware de
     // dentro do construtor do controller base dele. Declarado aqui, o gate
     // vale por contrato do kit.

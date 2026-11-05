@@ -1,6 +1,6 @@
 import { request as requestFactory } from '@playwright/test';
 import { deleteMailpitMessagesTo, deleteMailpitMessagesWithMarker } from './support/mailpit.js';
-import { dotEnv, fixedPeople, isolationProblem, mailpitBaseUrl } from './support/project-env.js';
+import { dotEnv, fixedPeople, isolationProblem, mailpitBaseUrl, mailpitProblem } from './support/project-env.js';
 
 // =============================================================================
 // Global teardown do E2E: as mensagens das pessoas FIXAS saem do Mailpit no
@@ -17,7 +17,7 @@ import { dotEnv, fixedPeople, isolationProblem, mailpitBaseUrl } from './support
 
 export default async function globalTeardown(config) {
     const baseURL = config.projects[0].use.baseURL;
-    const problem = isolationProblem(String(baseURL), mailpitBaseUrl, null);
+    const problem = isolationProblem(String(baseURL), mailpitBaseUrl, null) ?? (await mailpitProblem(mailpitBaseUrl));
 
     if (problem !== null) {
         console.warn(`limpeza E2E: as mensagens das pessoas fixas NÃO foram apagadas — ${problem}.`);

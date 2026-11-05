@@ -1,0 +1,71 @@
+#!/bin/sh
+# =============================================================================
+# scripts/segredos — VARREDURA DE SEGREDOS com o gitleaks, em container (sem
+# instalar nada; imagem oficial fixada por digest). Repositório sem secret
+# scanning do GitHub (privado de conta pessoal) não tem outra barreira.
+#
+#   scripts/segredos            o histórico do git inteiro (todo arquivo
+#                               versionado) + o que ainda não foi commitado
+#   scripts/segredos --staged   só o que está staged (o hook pre-commit)
+#
+# Sai com 0 sem achado, 1 com achado (o valor sai oculto) e 2 sem Docker.
+# Roda no scripts/verificar (primeiro passo), no CI e no hook pre-commit
+# (ligado pelo scripts/instalar-hooks).
+#
+# VALOR FICTÍCIO DE TESTE: libere pelo VALOR EXATO no .gitleaks.toml, com o
+# motivo — nunca por pasta, arquivo ou regra inteira.
+#
+# SEGREDO COMMITADO É SEGREDO VAZADO: apagar o arquivo (ou reescrever o
+# histórico) não desfaz a exposição — quem clonou ou viu já tem. Troque o
+# segredo no serviço (rotacione) primeiro; depois limpe o repositório.
+# =============================================================================
+set -eu
+
+GITLEAKS_IMAGE=ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+
+cd "$(dirname "$0")/.."
+
+STAGED=0
+case "${1:-}" in
+    --staged) STAGED=1 ;;
+    '') ;;
+    -h|--ajuda|--help) sed -n '2,/^# ====/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "scripts/segredos: opção desconhecida: $1 (veja scripts/segredos --ajuda)" >&2; exit 2 ;;
+esac
+
+if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+    echo 'scripts/segredos: o Docker não está disponível, e o gitleaks roda nele. Suba o Docker e repita.' >&2
+    exit 2
+fi
+
+if ! RAIZ=$(git rev-parse --show-toplevel 2>/dev/null); then
+    echo 'scripts/segredos: aviso — a pasta não é um repositório git; nada a varrer (o gitleaks confere o que vai para o repositório).' >&2
+    exit 0
+fi
+cd "$RAIZ"
+
+CONFIG=''
+[ -f .gitleaks.toml ] && CONFIG='--config=/repo/.gitleaks.toml'
+
+gitleaks() {
+    # shellcheck disable=SC2086 # CONFIG vazio = sem argumento
+    docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$RAIZ":/repo:ro -w /repo "$GITLEAKS_IMAGE" \
+        "$@" $CONFIG --no-banner --no-color --redact --log-level warn -v
+}
+
+if [ "$STAGED" = 1 ]; then
+    gitleaks git --pre-commit --staged /repo
+    exit 0
+fi
+
+# O histórico inteiro (todo commit, inclusive o conteúdo atual dos arquivos
+# versionados) e o que ainda não foi commitado: o staged e o modificado. Um
+# arquivo novo ainda não adicionado entra quando for staged — o hook
+# pre-commit o pega aí.
+if git rev-parse --verify -q HEAD >/dev/null; then
+    echo 'gitleaks: o histórico do git'
+    gitleaks git /repo
+fi
+echo 'gitleaks: o que ainda não foi commitado (staged e modificado)'
+gitleaks git --pre-commit --staged /repo
+gitleaks git --pre-commit /repo
