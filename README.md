@@ -27,17 +27,25 @@ ou `pdo_sqlite`), Composer 2 e Node 24.
 
 ```bash
 composer create-project "twstec/starter-livewire:^2.0@beta" meu-app
-# ou, com o instalador do Laravel:
-laravel new meu-app --using="twstec/starter-livewire:^2.0@beta"
+# ou, com o instalador do Laravel (as opções a mais são obrigatórias; ver abaixo):
+laravel new meu-app --using="twstec/starter-livewire:~2.0@beta" --database=pgsql --phpunit --no-boost
 ```
 
-O `post-create-project-cmd` cria o `.env`, gera a `APP_KEY` e o pepper das
-chaves de API e chama o instalador (`php artisan tws:install`), que num
-terminal pergunta os módulos opcionais. O `.env.example` aponta para o
-PostgreSQL do Docker de desenvolvimento do monorepo (`DB_HOST=postgres`):
-no projeto criado, aponte o `.env` para o seu banco (ou use
-`DB_CONNECTION=sqlite`) e rode `php artisan migrate`; depois `npm ci`,
-`npm run build` e `composer dev`. Detalhes em
+No `laravel new`, a versão no `--using` evita o branch de desenvolvimento,
+o `--database` igual ao banco escolhido no kit evita a troca do
+`DB_CONNECTION` para SQLite e o `--phpunit` evita a reinstalação do Pest que
+quebra os testes do kit (o projeto continua no Pest) — detalhes em
+[docs/instalacao.md](https://github.com/kelvindk9w/tws-laravel-starter-kit/blob/desenvolvimento/docs/instalacao.md#com-o-instalador-do-laravel-laravel-new).
+
+O Composer copia o `.env.example` para `.env`, e o `post-create-project-cmd`
+chama o instalador (`php artisan tws:install --graceful`), que num terminal
+pergunta os módulos opcionais, o banco (PostgreSQL, o padrão, ou SQLite — o
+modo protótipo) e se o projeto usa Redis (sim, o padrão); gera a `APP_KEY` e
+o pepper das chaves de API e configura o Docker de desenvolvimento do
+projeto (abaixo), em que as migrations rodam no primeiro `docker compose up
+-d`. Fora do Docker, aponte o `.env` para o seu banco e rode
+`php artisan migrate`; depois `npm ci`, `npm run build` e `composer dev`.
+Detalhes em
 [docs/instalacao.md](https://github.com/kelvindk9w/tws-laravel-starter-kit/blob/desenvolvimento/docs/instalacao.md).
 
 **Produção:** `docker compose -f docker-compose.prod.yml up -d --build`, com o
@@ -64,7 +72,8 @@ docker compose stop                           # para (os dados ficam)
 
 Sobem o site (nginx + PHP-FPM), o PostgreSQL, o Redis, o Mailpit (os e-mails,
 em `http://<nome>.localhost:802N`), a fila, o agendador e o Vite (recarga ao
-vivo). Tudo é publicado só em `127.0.0.1`; o Redis nunca, o banco só com
+vivo) — com SQLite, sem o PostgreSQL; sem Redis, sem o Redis. Tudo é
+publicado só em `127.0.0.1`; o Redis nunca, o banco só com
 `COMPOSE_PROFILES=db-port` no `.env`. Trocar portas ou o nome: edite o `.env`
 e rode `docker compose up -d`. No VS Code: extensão **Dev Containers** →
 "Reopen in Container". Detalhes em
