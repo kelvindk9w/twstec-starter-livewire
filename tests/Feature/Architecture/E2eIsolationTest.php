@@ -34,6 +34,7 @@ it('recusa o site e o Mailpit de outro projeto, com endereço explícito ou não
 
     $script = <<<'JS'
         import { createServer } from 'node:http';
+        import { pathToFileURL } from 'node:url';
 
         const [modulePath] = process.argv.slice(1);
         let label = 'acme';
@@ -45,7 +46,9 @@ it('recusa o site e o Mailpit de outro projeto, com endereço explícito ou não
         const mailpit = `http://127.0.0.1:${server.address().port}`;
         const closed = 'http://127.0.0.1:1';
 
-        const { isolationProblem, mailpitProblem } = await import(modulePath);
+        // Por URL file://: no Windows, o import() recusa o caminho com a letra
+        // do disco (D:\…).
+        const { isolationProblem, mailpitProblem } = await import(pathToFileURL(modulePath).href);
         const out = {};
 
         out.siteOwn = isolationProblem('http://acme.localhost:8080', 'http://127.0.0.1:8025', ['acme_session']);

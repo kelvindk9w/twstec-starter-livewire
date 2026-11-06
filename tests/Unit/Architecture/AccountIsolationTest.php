@@ -119,8 +119,13 @@ function isolationSources(): array
 
     foreach ((new Finder)->files()->in($pastas)->name('*.php') as $file) {
         // Caminho pelo vendor (não pelo link do monorepo): é assim que o
-        // aplicativo instalado vê o pacote.
-        $caminho = str_replace($base.'/', '', $file->getPath().'/'.$file->getFilename());
+        // aplicativo instalado vê o pacote. Sempre com `/`: no Windows, o
+        // base_path() e o Finder trazem `\` misturado.
+        $caminho = str_replace(
+            str_replace('\\', '/', $base).'/',
+            '',
+            str_replace('\\', '/', $file->getPath().'/'.$file->getFilename()),
+        );
         $arquivos[$caminho] = $file->getContents();
     }
 

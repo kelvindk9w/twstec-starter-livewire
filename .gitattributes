@@ -22,3 +22,4 @@
 # Só do repositório do kit (monorepo): confere o docker-compose.yml da raiz,
 # que não existe no projeto criado.
 /tests/Feature/Architecture/MonorepoDevelopmentStackTest.php export-ignore
+/tests/Feature/Customization/StarterOwnFilesTest.php export-ignore

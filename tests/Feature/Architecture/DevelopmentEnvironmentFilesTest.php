@@ -19,7 +19,8 @@ declare(strict_types=1);
 // - o Dependabot modelo: os cinco ecossistemas nos caminhos do projeto e os
 //   pacotes do kit (twstec/*) num grupo próprio;
 // - a verificação local com selo (opcional): os scripts existem, são
-//   executáveis e o pre-push só vale depois do scripts/instalar-hooks;
+//   executáveis (fora do Windows, que não tem o bit de execução) e o
+//   pre-push só vale depois do scripts/instalar-hooks;
 // - a varredura de segredos (gitleaks, imagem fixada por digest) no
 //   scripts/verificar, no CI base (com o histórico inteiro) e no pre-commit,
 //   e o .gitleaks.toml liberando só valores exatos (nunca pasta nem regra).
@@ -80,8 +81,6 @@ it('o CI base: manual e semanal, só leitura, ações fixadas por commit', funct
     foreach ($uses[1] as $action) {
         expect($action)->toMatch('/@[0-9a-f]{40}$/');
     }
-
-    expect(is_executable(base_path('scripts/verificar')))->toBeTrue();
 });
 
 it('o E2E do CI base: só no disparo manual, com .env efêmero e nenhum segredo do repositório', function (): void {
@@ -133,12 +132,10 @@ it('o Dependabot modelo: os cinco ecossistemas nos caminhos do projeto, twstec/*
         ->and(is_file(base_path('docker/nginx/Dockerfile')))->toBeTrue();
 });
 
-it('a verificação local com selo: scripts executáveis, sh válido e o pre-push só depois do instalar-hooks', function (): void {
+it('a verificação local com selo: os scripts com sh válido e o pre-push só depois do instalar-hooks', function (): void {
     $scripts = ['scripts/verificar', 'scripts/e2e', 'scripts/promover', 'scripts/instalar-hooks', 'scripts/hooks/pre-push'];
 
     foreach ($scripts as $script) {
-        expect(is_executable(base_path($script)))->toBeTrue("{$script} não é executável");
-
         exec('sh -n '.escapeshellarg(base_path($script)).' 2>&1', $output, $code);
         expect($code)->toBe(0, "{$script}: ".implode("\n", $output));
     }
@@ -205,7 +202,9 @@ it('a análise estática enxerga as colunas e os casts dos models do kit pelas e
     expect($packages)->not->toBeEmpty();
 
     foreach ($packages as $migrations) {
-        $extension = dirname($migrations, 2).'/extension.neon';
+        // Os caminhos comparados com `/` (no Windows, o base_path() vem com
+        // `\` e o phpstan.modules.php junta com `/`).
+        $extension = str_replace('\\', '/', dirname($migrations, 2).'/extension.neon');
 
         expect(is_file($extension))->toBeTrue("sem extension.neon: {$extension}");
 
@@ -214,7 +213,7 @@ it('a análise estática enxerga as colunas e os casts dos models do kit pelas e
         expect($neon)->toMatch("/^expandRelativePaths:\n\s+- '\[parameters\]\[databaseMigrationsPath\]\[\]'$/m")
             ->and($neon)->toMatch('/^\s+databaseMigrationsPath:\n\s+- database\/migrations$/m')
             ->and($neon)->toMatch('/^\s+parseModelCastsMethod: true$/m')
-            ->and($modules['includes'])->toContain($extension);
+            ->and(str_replace('\\', '/', $modules['includes']))->toContain($extension);
     }
 
     // Com as extensões, o Larastan não lê mais sozinho as migrations do
@@ -222,10 +221,20 @@ it('a análise estática enxerga as colunas e os casts dos models do kit pelas e
     expect($phpstan)->toMatch('/^\s+databaseMigrationsPath:\n\s+- database\/migrations$/m');
 });
 
+// O Windows não tem o bit de execução: lá os scripts (`sh`) rodam pelo WSL ou
+// pelo Git Bash, e a conferência não existe — a sintaxe e o conteúdo deles
+// continuam conferidos nos testes acima e abaixo.
+it('os scripts de verificação, de hooks e de segredos são executáveis', function (): void {
+    $scripts = ['scripts/verificar', 'scripts/e2e', 'scripts/promover', 'scripts/instalar-hooks', 'scripts/hooks/pre-push',
+        'scripts/segredos', 'scripts/hooks/pre-commit'];
+
+    foreach ($scripts as $script) {
+        expect(is_executable(base_path($script)))->toBeTrue("{$script} não é executável");
+    }
+})->skip(PHP_OS_FAMILY === 'Windows', 'O Windows não tem o bit de execução (os scripts rodam pelo WSL ou pelo Git Bash).');
+
 it('a varredura de segredos: gitleaks fixado por digest no verificar, no CI base e no pre-commit', function (): void {
     foreach (['scripts/segredos', 'scripts/hooks/pre-commit'] as $script) {
-        expect(is_executable(base_path($script)))->toBeTrue("{$script} não é executável");
-
         exec('sh -n '.escapeshellarg(base_path($script)).' 2>&1', $output, $code);
         expect($code)->toBe(0, "{$script}: ".implode("\n", $output));
     }
