@@ -23,12 +23,12 @@
         "laravel/tinker": "^3.0",
         "livewire/livewire": "^4.4",
         "spatie/laravel-backup": "^10.3",
-        "twstec/kit-accounts": "^2.0@beta",
-        "twstec/kit-admin": "^2.0@beta",
-        "twstec/kit-auth": "^2.0@beta",
-        "twstec/kit-foundation": "^2.0@beta",
-        "twstec/kit-uploads": "^2.0@beta",
-        "twstec/kit-webhooks": "^2.0@beta"
+        "twstec/kit-accounts": "^2.0",
+        "twstec/kit-admin": "^2.0",
+        "twstec/kit-auth": "^2.0",
+        "twstec/kit-foundation": "^2.0",
+        "twstec/kit-uploads": "^2.0",
+        "twstec/kit-webhooks": "^2.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -41,7 +41,7 @@
         "pestphp/pest": "^4.7",
         "pestphp/pest-plugin-laravel": "^4.1",
         "phpunit/phpunit": "^12.5.12",
-        "twstec/kit-installer": "^2.0@beta"
+        "twstec/kit-installer": "^2.0"
     },
     "autoload": {
         "psr-4": {

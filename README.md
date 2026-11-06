@@ -26,9 +26,9 @@ Requisitos: PHP 8.4 (extensões `intl`, `bcmath`, `gd`, `pcntl`, `pdo_pgsql`
 ou `pdo_sqlite`), Composer 2 e Node 24.
 
 ```bash
-composer create-project "twstec/starter-livewire:~2.0@beta" meu-app
+composer create-project "twstec/starter-livewire:~2.0" meu-app
 # ou, com o instalador do Laravel (as opções a mais são obrigatórias; ver abaixo):
-laravel new meu-app --using="twstec/starter-livewire:~2.0@beta" --database=pgsql --phpunit --no-boost
+laravel new meu-app --using="twstec/starter-livewire:~2.0" --database=pgsql --phpunit --no-boost
 ```
 
 No `laravel new`, a versão no `--using` evita o branch de desenvolvimento,

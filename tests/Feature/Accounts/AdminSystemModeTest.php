@@ -54,8 +54,10 @@ it('GET do painel: o /admin vê projetos e chaves de TODAS as contas, com a cont
 
 it('endpoint do Livewire: a atualização de um componente do /admin roda em modo sistema', function (): void {
     $admin = User::factory()->create(['is_admin' => true]);
-    criarChave(User::factory()->create(), ['name' => 'Chave da Ana']);
-    criarChave(User::factory()->create(), ['name' => 'Chave do Bruno']);
+    // E-mails fixos: a busca também procura no e-mail de quem é dono e de
+    // quem criou a chave, e um e-mail aleatório (pt_BR) pode conter "bruno".
+    criarChave(User::factory()->create(['email' => 'ana@example.com']), ['name' => 'Chave da Ana']);
+    criarChave(User::factory()->create(['email' => 'bruno@example.com']), ['name' => 'Chave do Bruno']);
 
     $html = $this->actingAs($admin)->get('/admin/api-keys')->assertOk()->getContent();
 
