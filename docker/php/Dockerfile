@@ -23,7 +23,7 @@
 # Se o composer.json tiver path repository e o contexto faltar, o build para
 # com a instrução, em vez de um erro de caminho do Composer.
 #
-# Base pinada: php:8.4.24-fpm-alpine (nunca usar `latest`).
+# Base pinada: php:8.4.27-fpm-alpine (nunca usar `latest`).
 # Extensões: pgsql, redis, intl, bcmath, gd (re-encode de imagem do
 # twstec/kit-uploads, que também exige a fileinfo, nativa do PHP), zip,
 # opcache, pcntl (filas).
@@ -36,7 +36,7 @@
 # -----------------------------------------------------------------------------
 # Base compartilhada: PHP-FPM 8.4 + extensões exigidas pelo projeto
 # -----------------------------------------------------------------------------
-FROM php:8.4.24-fpm-alpine AS base
+FROM php:8.4.27-fpm-alpine AS base
 
 # Bibliotecas de runtime + dependências de build das extensões.
 # .build-deps é removido ao final para manter a imagem enxuta.

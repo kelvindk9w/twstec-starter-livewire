@@ -7,6 +7,7 @@ use Twstec\Kit\Accounts\Account\Enums\AccountRole;
 use Twstec\Kit\Accounts\Account\Services\AccountService;
 use Twstec\Kit\Accounts\Accounts;
 use Twstec\Kit\Accounts\Tenancy\Models\Project;
+use Twstec\Kit\Foundation\Logging\Enums\RequestActorType;
 use Twstec\Kit\Foundation\Logging\Models\RequestLog;
 
 // =============================================================================
@@ -61,4 +62,24 @@ it('a chave continua valendo depois que quem a criou sai da conta — e a conta 
     $this->getJson('/api/v1/projects', headersApi($chave, $segredo))
         ->assertOk()
         ->assertJsonPath('data.0.name', 'Da empresa');
+});
+
+it('a trilha diz que foi a chave: tipo api_key, o uuid da chave e o da pessoa por trás dela — e nenhuma credencial nos cabeçalhos gravados', function (): void {
+    $pessoa = User::factory()->create();
+    projetoDe($pessoa, 'Pessoal');
+    ['api_key' => $chave, 'secret_key' => $segredo] = criarChave($pessoa);
+
+    $resposta = $this->getJson('/api/v1/projects', [...headersApi($chave, $segredo), 'Idempotency-Key' => 'leitura-1'])->assertOk();
+
+    $log = RequestLog::query()->where('correlation_id', $resposta->headers->get('X-Correlation-Id'))->sole();
+    $gravado = json_encode($log->getAttributes(), JSON_UNESCAPED_SLASHES);
+
+    expect($log->actor_type)->toBe(RequestActorType::ApiKey)
+        ->and($log->api_key_uuid)->toBe($chave->uuid)
+        ->and($log->actor_uuid)->toBe($pessoa->uuid)
+        ->and($log->headers)->toHaveKey('idempotency-key', 'leitura-1')
+        ->and($log->headers)->not->toHaveKey('authorization')
+        ->and($log->headers)->not->toHaveKey('x-api-key')
+        ->and($gravado)->not->toContain($segredo)
+        ->and($gravado)->not->toContain((string) $chave->public_key);
 });
