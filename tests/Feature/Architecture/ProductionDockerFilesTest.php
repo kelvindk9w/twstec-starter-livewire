@@ -161,3 +161,14 @@ it('o nginx de produção não desfaz a Referrer-Policy mais restrita de uma rot
         ->and($conf)->toMatch('/add_header Referrer-Policy \$kit_referrer_policy always;/')
         ->and($conf)->toContain('fastcgi_hide_header Referrer-Policy;');
 });
+
+it('o PHP das imagens de desenvolvimento e de produção desliga o progresso de upload da sessão (mitigação da CVE-2026-115560)', function (string $ini): void {
+    $settings = parse_ini_file(base_path($ini), false, INI_SCANNER_RAW);
+
+    expect($settings)->toBeArray()
+        ->and($settings['session.upload_progress.enabled'] ?? null)->toBe('0')
+        ->and(productionFile($ini))->toContain('CVE-2026-115560');
+
+    // O arquivo entra mesmo na imagem (o Dockerfile o copia para o conf.d).
+    expect(productionFile('docker/php/Dockerfile'))->toContain('COPY '.$ini.' /usr/local/etc/php/conf.d/');
+})->with(['docker/php/php-dev.ini', 'docker/php/php-prod.ini']);

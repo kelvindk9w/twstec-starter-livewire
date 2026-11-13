@@ -89,6 +89,17 @@
         <server name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>
         <server name="SESSION_DRIVER" value="array" force="true"/>
+        <!-- Log: NADA vai para storage/logs nos testes. O padrão (laravel.log)
+             vai para o canal `null` e o `request_log` do kit descarta
+             (REQUEST_LOG_DISCARD, só vale com APP_ENV=testing). A suíte
+             rodada a cada verificação enchia o disco com dezenas de MB por
+             dia. Log::spy()/Log::shouldReceive()/Log::listen() continuam
+             vendo cada linha; o teste que precisa de ARQUIVO aponta um canal
+             para um caminho temporário. -->
+        <env name="LOG_CHANNEL" value="null" force="true"/>
+        <server name="LOG_CHANNEL" value="null" force="true"/>
+        <env name="REQUEST_LOG_DISCARD" value="true" force="true"/>
+        <server name="REQUEST_LOG_DISCARD" value="true" force="true"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

@@ -12,6 +12,7 @@ use Twstec\Kit\Accounts\Account\Enums\AccountAbility;
 use Twstec\Kit\Accounts\Account\Support\AccountResourceGuard;
 use Twstec\Kit\Accounts\Accounts;
 use Twstec\Kit\Accounts\Tenancy\Enums\ProjectAttempt;
+use Twstec\Kit\Accounts\Tenancy\Exceptions\ProjectDeletionRefusedException;
 use Twstec\Kit\Accounts\Tenancy\Models\Project;
 use Twstec\Kit\Accounts\Tenancy\Services\ProjectService;
 
@@ -135,10 +136,23 @@ final class Index extends Component
     public function removeProject(): void
     {
         $this->guard()->authorize(AccountAbility::DeleteProjects, ProjectAttempt::Deleted, $this->confirmingDeleteUuid);
+        $project = $this->findOwned((string) $this->confirmingDeleteUuid, ProjectAttempt::Deleted);
+        $this->resetErrorBag('project');
 
-        // O vínculo N:N cai junto; a chave que só atendia este projeto segue
-        // restrita, agora a nenhum (ver ProjectService::delete()).
-        $this->service()->delete($this->findOwned((string) $this->confirmingDeleteUuid, ProjectAttempt::Deleted));
+        try {
+            // O vínculo N:N cai junto; a chave que só atendia este projeto
+            // segue restrita, agora a nenhum (ver ProjectService::delete()).
+            $this->service()->delete($project);
+        } catch (ProjectDeletionRefusedException $refused) {
+            // Uma regra do aplicativo (ou um registro que ainda aponta para o
+            // projeto) recusou: nada saiu, a recusa fica na trilha e a tela
+            // mostra o motivo no lugar do aviso de sucesso.
+            $this->guard()->projectDeletionRefused($project, $refused);
+            $this->cancelDelete();
+            $this->addError('project', $refused->getMessage());
+
+            return;
+        }
 
         $this->cancelDelete();
         session()->flash('projects_status', __('panel.projects.deleted'));

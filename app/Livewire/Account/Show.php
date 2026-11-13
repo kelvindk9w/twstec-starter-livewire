@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Twstec\Kit\Accounts\Account\Actions\ChangeApiLimits;
 use Twstec\Kit\Accounts\Account\Actions\ChangeMemberRole;
 use Twstec\Kit\Accounts\Account\Actions\DeleteAccount;
 use Twstec\Kit\Accounts\Account\Actions\InviteMember;
@@ -27,6 +28,9 @@ use Twstec\Kit\Accounts\Account\Models\AccountInvitation;
 use Twstec\Kit\Accounts\Account\Queries\AccountDirectory;
 use Twstec\Kit\Accounts\Account\Support\MemberRules;
 use Twstec\Kit\Accounts\Accounts;
+use Twstec\Kit\Accounts\Tenancy\Limits\ApiLimit;
+use Twstec\Kit\Accounts\Tenancy\Limits\ApiLimits;
+use Twstec\Kit\Accounts\Tenancy\Limits\ApiLimitsPanel;
 
 /**
  * A PÁGINA DA CONTA ATUAL — dados, membros, convites e os fluxos de dono.
@@ -55,6 +59,10 @@ final class Show extends Component
 
     public string $name = '';
 
+    // --- Limites da API (redução do dono; vazio = sem redução) ------------------
+    /** @var array<string, string> */
+    public array $apiLimitValues = [];
+
     // --- Convite -------------------------------------------------------------
     public string $inviteEmail = '';
 
@@ -77,6 +85,37 @@ final class Show extends Component
     {
         $salvo = session(self::VIEW_SESSION_KEY);
         $this->view = in_array($salvo, ['table', 'cards'], true) ? $salvo : 'table';
+        $this->fillApiLimits();
+    }
+
+    // =========================================================================
+    // Limites da API (só o dono baixa; nunca acima do que a plataforma dá)
+    // =========================================================================
+
+    public function saveApiLimits(ChangeApiLimits $change): void
+    {
+        $rules = [];
+        $names = [];
+        $fields = [];
+
+        foreach (ApiLimit::cases() as $limit) {
+            $rules['apiLimitValues.'.$limit->value] = ['nullable', 'integer', 'min:1', 'max:'.ApiLimit::MAX];
+            $names['apiLimitValues.'.$limit->value] = $limit->label();
+            $fields[$limit->value] = 'apiLimitValues.'.$limit->value;
+        }
+
+        $this->validate($rules, [], $names);
+
+        $values = [];
+
+        foreach (ApiLimit::cases() as $limit) {
+            $values[$limit->value] = $this->apiLimitValues[$limit->value] ?? null;
+        }
+
+        $this->run(fn () => $change->handle($this->user(), $values), $fields);
+
+        $this->fillApiLimits();
+        session()->flash('account_status', __('panel.account.api_limits_saved'));
     }
 
     // =========================================================================
@@ -288,6 +327,7 @@ final class Show extends Component
             'canTransfer' => ! $account->isPersonal() && Accounts::can(AccountAbility::TransferOwnership),
             'canDelete' => ! $account->isPersonal() && Accounts::can(AccountAbility::DeleteAccount),
             'canLeave' => MemberRules::canLeave($papel),
+            'apiLimits' => ApiLimitsPanel::for($account),
             'transferCandidates' => $members->reject(fn (array $m): bool => $m['role'] === AccountRole::Owner),
             'hasTransactionPassword' => $this->user()->hasTransactionPassword(),
             'sensitiveDescription' => match ($this->pendingAction) {
@@ -367,6 +407,17 @@ final class Show extends Component
 
             throw ValidationException::withMessages($erros);
         }
+    }
+
+    /**
+     * O formulário dos limites com a redução atual do dono.
+     */
+    private function fillApiLimits(): void
+    {
+        $this->apiLimitValues = array_map(
+            static fn (?int $value): string => $value === null ? '' : (string) $value,
+            app(ApiLimits::class)->ownReductions($this->account()),
+        );
     }
 
     private function requireTransactionPassword(string $campo): void

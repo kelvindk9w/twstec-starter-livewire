@@ -3,6 +3,11 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Twstec\Kit\Accounts\Deletion\DeletionImpediment;
+use Twstec\Kit\Accounts\Tenancy\Deletion\ProjectDeletionImpediments;
 use Twstec\Kit\Accounts\Tenancy\Enums\ProjectStatus;
 use Twstec\Kit\Accounts\Tenancy\Models\Project;
 
@@ -102,4 +107,43 @@ it('valida o nome na criação', function () {
         ->assertUnprocessable()
         ->assertJsonPath('error.code', 'validation_failed')
         ->assertJsonStructure(['error' => ['errors' => ['name']]]);
+});
+
+it('regra do aplicativo impede a exclusão: 409 project_deletion_refused com o motivo, e o projeto fica', function () {
+    $user = User::factory()->create();
+    ['api_key' => $key, 'secret_key' => $secret] = criarChave($user);
+    $projeto = projetoDe($user, 'Com cobranças');
+    app(ProjectDeletionImpediments::class)->register(fn (Project $alvo): array => $alvo->is($projeto)
+        ? [new DeletionImpediment('project_has_charges', 'O projeto tem cobranças e não pode ser excluído.')]
+        : []);
+
+    $this->deleteJson("/api/v1/projects/{$projeto->uuid}", [], headersApi($key, $secret))
+        ->assertStatus(409)
+        ->assertExactJsonStructure(['error' => ['code', 'message', 'correlation_id']])
+        ->assertJsonPath('error.code', 'project_deletion_refused')
+        ->assertJsonPath('error.message', 'O projeto tem cobranças e não pode ser excluído.');
+
+    expect(comoSistema(fn () => Project::query()->whereKey($projeto->getKey())->exists()))->toBeTrue();
+});
+
+it('registro do aplicativo com chave estrangeira RESTRICT para o projeto: 409 conflict genérico, nunca 500', function () {
+    Schema::create('pedidos_de_teste', function (Blueprint $table): void {
+        $table->id();
+        $table->foreignId('project_id')->constrained('projects')->restrictOnDelete();
+    });
+
+    $user = User::factory()->create();
+    ['api_key' => $key, 'secret_key' => $secret] = criarChave($user);
+    $projeto = projetoDe($user, 'Referenciado');
+    DB::table('pedidos_de_teste')->insert(['project_id' => $projeto->getKey()]);
+
+    $this->deleteJson("/api/v1/projects/{$projeto->uuid}", [], headersApi($key, $secret))
+        ->assertStatus(409)
+        ->assertJsonPath('error.code', 'conflict')
+        ->assertJsonPath('error.message', __('api_keys.projects.deletion_referenced'));
+
+    // A conexão segue utilizável (no PostgreSQL, sem o savepoint, a transação
+    // do teste ficaria abortada) e nada saiu.
+    expect(DB::table('pedidos_de_teste')->count())->toBe(1)
+        ->and(comoSistema(fn () => Project::query()->whereKey($projeto->getKey())->exists()))->toBeTrue();
 });

@@ -10,6 +10,7 @@ use Twstec\Kit\Demo\Showcase\Support\FormSubmissionGuard;
 use Twstec\Kit\Foundation\Logging\CardNumberMaskingFormatter;
 use Twstec\Kit\Foundation\Logging\MaskCardNumbersInLogs;
 use Twstec\Kit\Foundation\Logging\Models\RequestLog;
+use Twstec\Kit\Foundation\Logging\RequestLogChannel;
 use Twstec\Kit\Foundation\Support\Platform;
 
 // Número de cartão (PAN) nunca é persistido em claro (PCI DSS req. 3): nem
@@ -95,7 +96,12 @@ it('a detecção de ataque do formulário vê o texto original (mascarar não es
 
 it('mascara o cartão no log de arquivo, na mensagem, no contexto e na exceção', function (string $channel) {
     $path = storage_path('framework/testing/pan-'.$channel.'-'.uniqid().'.log');
-    config()->set("logging.channels.{$channel}.path", $path);
+    // O canal DE ARQUIVO de verdade, num caminho temporário: nos testes o
+    // `request_log` descarta (REQUEST_LOG_DISCARD), e é o arquivo que se
+    // confere aqui.
+    $channel === 'request_log'
+        ? config()->set('logging.channels.request_log', [...RequestLogChannel::fileDefinition(), 'path' => $path])
+        : config()->set("logging.channels.{$channel}.path", $path);
     Log::forgetChannel($channel);
 
     Log::channel($channel)->error('falha ao cobrar 5555555555554444', [
@@ -119,7 +125,7 @@ it('mascara o cartão no log de arquivo, na mensagem, no contexto e na exceção
 
 it('o JSON do request_log continua válido depois da máscara', function () {
     $path = storage_path('framework/testing/pan-json-'.uniqid().'.log');
-    config()->set('logging.channels.request_log.path', $path);
+    config()->set('logging.channels.request_log', [...RequestLogChannel::fileDefinition(), 'path' => $path]);
     Log::forgetChannel('request_log');
 
     Log::channel('request_log')->info('request.started', ['nota' => 'cartão 4111111111111111']);
@@ -133,7 +139,11 @@ it('o JSON do request_log continua válido depois da máscara', function () {
 });
 
 it('todo canal de log que escreve texto tem o tap de mascaramento', function (string $channel) {
-    expect(config("logging.channels.{$channel}.tap"))->toContain(MaskCardNumbersInLogs::class);
+    // O `request_log` dos testes descarta (não escreve nada); o que escreve
+    // fora deles é o de arquivo.
+    $definition = $channel === 'request_log' ? RequestLogChannel::fileDefinition() : config("logging.channels.{$channel}");
+
+    expect($definition['tap'] ?? null)->toContain(MaskCardNumbersInLogs::class);
 })->with(['single', 'daily', 'monthly', 'slack', 'papertrail', 'stderr', 'syslog', 'errorlog', 'request_log']);
 
 it('o tap não envolve o mesmo formatter duas vezes', function () {

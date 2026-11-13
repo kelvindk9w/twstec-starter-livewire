@@ -5,7 +5,10 @@ declare(strict_types=1);
 use App\Livewire\Projects\Index;
 use App\Models\User;
 use Livewire\Livewire;
+use Twstec\Kit\Accounts\Deletion\DeletionImpediment;
+use Twstec\Kit\Accounts\Tenancy\Deletion\ProjectDeletionImpediments;
 use Twstec\Kit\Accounts\Tenancy\Models\Project;
+use Twstec\Kit\Foundation\Audit\Models\AuditEvent;
 
 // =============================================================================
 // Projetos pela UI (Livewire): CRUD só com nome, tudo na
@@ -88,6 +91,30 @@ it('exclui com confirmação inline', function () {
         ->call('removeProject');
 
     expect(comoSistema(fn () => Project::query()->count()))->toBe(0);
+});
+
+it('exclusão recusada por uma regra do aplicativo: a tela mostra o motivo (não o sucesso), nada sai e a recusa fica na trilha', function () {
+    $user = User::factory()->create();
+    $project = projetoDe($user, 'Com cobranças');
+    app(ProjectDeletionImpediments::class)->register(fn (Project $projeto): array => [
+        new DeletionImpediment('project_has_charges', 'O projeto tem cobranças e não pode ser excluído.'),
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(Index::class)
+        ->call('startDelete', $project->uuid)
+        ->call('removeProject')
+        ->assertHasErrors('project')
+        ->assertSet('confirmingDeleteUuid', null)
+        ->assertSee('O projeto tem cobranças e não pode ser excluído.')
+        ->assertDontSee(__('panel.projects.deleted'));
+
+    expect(comoSistema(fn () => Project::query()->count()))->toBe(1);
+
+    $recusa = comoSistema(fn () => AuditEvent::query()->where('action', 'project.deleted')->sole());
+    expect($recusa->outcome->value)->toBe('denied')
+        ->and($recusa->reason)->toBe('O projeto tem cobranças e não pode ser excluído.')
+        ->and($recusa->subject_uuid)->toBe((string) $project->uuid);
 });
 
 it('não toca em projeto de outro tenant (404 uniforme — anti-IDOR)', function () {

@@ -16,6 +16,7 @@ use Twstec\Kit\Accounts\Account\Models\Account;
 use Twstec\Kit\Accounts\Account\Models\AccountInvitation;
 use Twstec\Kit\Accounts\Account\Services\AccountService;
 use Twstec\Kit\Accounts\Accounts;
+use Twstec\Kit\Accounts\Tenancy\Limits\ApiLimits;
 use Twstec\Kit\Accounts\Tenancy\Models\Project;
 use Twstec\Kit\Auth\Mail\VerificationCodeMail;
 use Twstec\Kit\Foundation\Audit\Models\AuditEvent;
@@ -397,4 +398,44 @@ it('sair pela tela e depois ter o acesso excluído: o aviso de chave órfã sai 
     Mail::assertQueued(OrphanedApiKeysMail::class, 2);
     Mail::assertQueued(OrphanedApiKeysMail::class, fn (OrphanedApiKeysMail $m): bool => $m->hasTo($dono->email) && ! $m->deleted);
     Mail::assertQueued(OrphanedApiKeysMail::class, fn (OrphanedApiKeysMail $m): bool => $m->hasTo($admin->email) && ! $m->deleted);
+});
+
+it('limites da API: o dono baixa (nunca acima do máximo), os outros papéis só veem — e o envio por fora é recusado', function (): void {
+    config()->set('api_keys.limits.enabled', true);
+    config()->set('api_keys.limits.quota', 1000);
+    ['empresa' => $empresa, 'dono' => $dono, 'admin' => $admin] = contaComEquipe();
+
+    paginaDaConta($dono, $empresa)
+        ->assertSeeHtml('data-api-limits')
+        ->assertSeeHtml('wire:model="apiLimitValues.quota"')
+        ->assertSee(__('panel.account.api_limits_values', ['effective' => '1.000', 'platform' => '1.000']))
+        ->set('apiLimitValues.quota', '1001')
+        ->call('saveApiLimits')
+        ->assertHasErrors(['apiLimitValues.quota' => __('accounts.api_limits.above_platform', ['max' => 1000])])
+        ->set('apiLimitValues.quota', '300')
+        ->call('saveApiLimits')
+        ->assertHasNoErrors()
+        ->assertSee(__('panel.account.api_limits_saved'))
+        ->assertSee(__('panel.account.api_limits_values', ['effective' => '300', 'platform' => '1.000']))
+        ->assertSet('apiLimitValues.quota', '300');
+
+    expect(app(ApiLimits::class)->effective($empresa->refresh())->quota)->toBe(300);
+
+    paginaDaConta($admin, $empresa)
+        ->assertSeeHtml('data-api-limits')
+        ->assertDontSeeHtml('wire:model="apiLimitValues.quota"')
+        ->assertSee(__('panel.account.api_limits_values', ['effective' => '300', 'platform' => '1.000']))
+        ->set('apiLimitValues.quota', '10')
+        ->call('saveApiLimits')
+        ->assertForbidden();
+
+    expect(app(ApiLimits::class)->effective($empresa->refresh())->quota)->toBe(300)
+        ->and(AuditEvent::query()->where('tenant_uuid', $empresa->uuid)->where('action', 'account.api_limits_changed')->pluck('outcome')->map(fn ($o) => $o->value)->sort()->values()->all())
+        ->toBe(['denied', 'denied', 'success']);
+});
+
+it('limites da API desligados (padrão): a seção não aparece', function (): void {
+    ['empresa' => $empresa, 'dono' => $dono] = contaComEquipe();
+
+    paginaDaConta($dono, $empresa)->assertDontSeeHtml('data-api-limits');
 });
