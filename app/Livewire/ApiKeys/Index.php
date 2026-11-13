@@ -7,17 +7,18 @@ namespace App\Livewire\ApiKeys;
 use App\Livewire\Concerns\ConfirmsSensitiveAction;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Twstec\Kit\Accounts\Account\Enums\AccountAbility;
 use Twstec\Kit\Accounts\Account\Support\AccountResourceGuard;
 use Twstec\Kit\Accounts\Accounts;
+use Twstec\Kit\Accounts\ApiKeys\Confirmation\ApiKeyCreationConfirmation;
 use Twstec\Kit\Accounts\ApiKeys\Enums\ApiKeyAttempt;
 use Twstec\Kit\Accounts\ApiKeys\Http\Requests\StoreApiKeyRequest;
 use Twstec\Kit\Accounts\ApiKeys\Models\ApiKey;
 use Twstec\Kit\Accounts\ApiKeys\Services\ApiKeyService;
+use Twstec\Kit\Accounts\ApiKeys\Support\ApiKeyExpiry;
 use Twstec\Kit\Accounts\Tenancy\Models\Project;
 use Twstec\Kit\Auth\Services\SensitiveActionService;
 
@@ -29,9 +30,13 @@ use Twstec\Kit\Auth\Services\SensitiveActionService;
  * revogar e editar vínculos de projetos.
  *
  * ZERO lógica duplicada: criação/rotação/revogação/vínculos delegam ao
- * ApiKeyService e a confirmação sensível ao SensitiveActionService
- * (senha de transação → código por e-mail → token de uso único,
- * consumido aqui via validateToken — mesmo contrato do middleware da API).
+ * ApiKeyService. A rotação é ação sensível (SensitiveActionService: senha de
+ * transação → código por e-mail → token de uso único, consumido aqui via
+ * validateToken — mesmo contrato do middleware da API). A criação segue a
+ * confirmação do ambiente das chaves (ApiKeyCreationConfirmation,
+ * `api_keys.creation_confirmation`): em `live`, senha de transação + código,
+ * sempre; em `test`, por padrão, só o código por e-mail. A validade é
+ * escolhida na criação: sem validade, N horas ou N dias (ApiKeyExpiry).
  *
  * As chaves são da CONTA ATUAL (o escopo das contas filtra toda consulta);
  * gerir chaves exige o papel owner ou admin na conta
@@ -45,14 +50,23 @@ use Twstec\Kit\Auth\Services\SensitiveActionService;
  */
 final class Index extends Component
 {
-    use ConfirmsSensitiveAction;
+    use ConfirmsSensitiveAction {
+        sendSensitiveCode as private sendSensitiveCodeWithPassword;
+        resendSensitiveCode as private resendSensitiveCodeWithPassword;
+        confirmSensitiveAction as private confirmSensitiveActionWithToken;
+        resendCooldown as private sensitiveResendCooldown;
+    }
 
     // --- Formulário de criação (inline, mesma tela) --------------------------
     public bool $showCreateForm = false;
 
     public string $name = '';
 
-    public ?string $expiresAt = null;
+    /** Validade escolhida: 'none' | 'hours' | 'days' (ApiKeyExpiry). */
+    public string $expiryUnit = ApiKeyExpiry::NONE;
+
+    /** Quantidade de horas ou dias (vazio sem validade). */
+    public ?int $expiryAmount = null;
 
     /** Toggle "todas as permissões" (padrão). */
     public bool $allScopes = true;
@@ -125,14 +139,15 @@ final class Index extends Component
     {
         $this->authorizeManage(ApiKeyAttempt::Created);
         $this->resetValidation();
-        $this->reset('name', 'expiresAt', 'selectedScopes', 'selectedProjectUuids');
+        $this->reset('name', 'expiryUnit', 'expiryAmount', 'selectedScopes', 'selectedProjectUuids');
         $this->allScopes = true;
         $this->showCreateForm = true;
     }
 
     /**
-     * Passo 1 da criação: valida o formulário e abre a confirmação sensível
-     * (criação de chave é ação sensível).
+     * Passo 1 da criação: valida o formulário e abre a confirmação da
+     * criação (a do ambiente das chaves: senha de transação + código, ou só o
+     * código).
      */
     public function requestCreate(): void
     {
@@ -140,7 +155,7 @@ final class Index extends Component
         $this->validateKeyForm();
         $this->resolveSelectedProjects(app(ApiKeyService::class));
 
-        if (! $this->user()->hasTransactionPassword()) {
+        if ($this->creationConfirmation()->requiresTransactionPassword() && ! $this->user()->hasTransactionPassword()) {
             throw ValidationException::withMessages([
                 'name' => __('panel.api_keys.sensitive_requires_password'),
             ]);
@@ -148,6 +163,91 @@ final class Index extends Component
 
         $this->showCreateForm = false;
         $this->openSensitiveModal('create');
+    }
+
+    // =========================================================================
+    // Confirmação da CRIAÇÃO pela política do ambiente das chaves
+    // (ApiKeyCreationConfirmation). A rotação segue a ação sensível do trait.
+    // =========================================================================
+
+    public function sendSensitiveCode(SensitiveActionService $sensitive): void
+    {
+        if (! $this->confirmingCreation()) {
+            $this->sendSensitiveCodeWithPassword($sensitive);
+
+            return;
+        }
+
+        $confirmation = $this->creationConfirmation();
+
+        if ($confirmation->requiresTransactionPassword()) {
+            $this->validate(['sensitivePassword' => ['required', 'string']], [], ['sensitivePassword' => __('auth.ui.transaction_password_title')]);
+        }
+
+        try {
+            $confirmation->sendCode($this->user(), $this->sensitivePassword);
+        } catch (ValidationException $exception) {
+            throw $this->mapSensitiveErrors($exception);
+        } finally {
+            // Como no trait: a senha de transação não fica no estado do componente.
+            $this->reset('sensitivePassword');
+        }
+
+        $this->codeSent = true;
+        $this->reset('sensitiveCode');
+    }
+
+    /**
+     * Outro código: na política forte, volta ao passo da senha (como no
+     * trait); só com código, manda outro na hora.
+     */
+    public function resendSensitiveCode(): void
+    {
+        if (! $this->confirmingCreation() || $this->creationConfirmation()->requiresTransactionPassword()) {
+            $this->resendSensitiveCodeWithPassword();
+
+            return;
+        }
+
+        $this->resetValidation();
+        $this->sendSensitiveCode(app(SensitiveActionService::class));
+    }
+
+    public function confirmSensitiveAction(SensitiveActionService $sensitive): void
+    {
+        if (! $this->confirmingCreation()) {
+            $this->confirmSensitiveActionWithToken($sensitive);
+
+            return;
+        }
+
+        $this->validate(['sensitiveCode' => ['required', 'string', 'size:6']], [], ['sensitiveCode' => __('panel.sensitive.code')]);
+        $this->authorizeManage(ApiKeyAttempt::Created);
+
+        // O formulário de novo ANTES de gastar o código (o estado do
+        // componente vem do navegador): o erro aparece no passo do código.
+        try {
+            $this->validateKeyForm();
+        } catch (ValidationException $exception) {
+            throw ValidationException::withMessages(['sensitiveCode' => collect($exception->errors())->flatten()->all()]);
+        }
+
+        try {
+            $this->creationConfirmation()->confirm($this->user(), $this->sensitiveCode)->consumeFor($this->user());
+
+            $this->performCreate(app(ApiKeyService::class));
+        } catch (ValidationException $exception) {
+            throw $this->mapSensitiveErrors($exception);
+        }
+
+        $this->closeSensitiveModal();
+    }
+
+    public function resendCooldown(): int
+    {
+        return $this->confirmingCreation()
+            ? $this->creationConfirmation()->resendCooldownRemaining($this->user())
+            : $this->sensitiveResendCooldown();
     }
 
     // =========================================================================
@@ -267,22 +367,19 @@ final class Index extends Component
 
     protected function performSensitiveAction(string $action, string $token): void
     {
-        $this->authorizeManage(
-            $action === 'rotate' ? ApiKeyAttempt::Rotated : ApiKeyAttempt::Created,
-            $action === 'rotate' ? $this->rotatingKeyUuid : null,
-        );
+        // Só a rotação passa por aqui: a criação é confirmada pela política do
+        // ambiente (confirmSensitiveAction acima), nunca por este token.
+        if ($action !== 'rotate') {
+            return;
+        }
+
+        $this->authorizeManage(ApiKeyAttempt::Rotated, $this->rotatingKeyUuid);
 
         // Consome o token exatamente como o middleware `sensitive.token`
         // faria na API — a operação abaixo é a única autorizada por ele.
         abort_unless(app(SensitiveActionService::class)->validateToken($this->user(), $token), 403);
 
-        $apiKeys = app(ApiKeyService::class);
-
-        match ($action) {
-            'create' => $this->performCreate($apiKeys),
-            'rotate' => $this->performRotate($apiKeys),
-            default => null,
-        };
+        $this->performRotate(app(ApiKeyService::class));
     }
 
     // =========================================================================
@@ -302,6 +399,11 @@ final class Index extends Component
             'projects' => $this->projects(),
             'scopesCatalog' => (array) config('api_keys.scopes_catalog', []),
             'hasTransactionPassword' => $this->user()->hasTransactionPassword(),
+            'expiryOptions' => ApiKeyExpiry::options(),
+            'creationRequiresTransactionPassword' => $this->creationConfirmation()->requiresTransactionPassword(),
+            // O modal da confirmação sem o campo da senha: a criação, quando a
+            // política do ambiente pede só o código.
+            'sensitivePasswordless' => $this->confirmingCreation() && ! $this->creationConfirmation()->requiresTransactionPassword(),
             'canManageKeys' => Accounts::can(AccountAbility::ManageApiKeys),
         ])->title(__('panel.api_keys.title'));
     }
@@ -312,13 +414,15 @@ final class Index extends Component
 
     /**
      * Validação do formulário de chave — MESMAS regras do StoreApiKeyRequest
-     * da API v1, para UI e API se comportarem igual.
+     * da API v1, para UI e API se comportarem igual; a validade, porém, é a
+     * escolha da tela (ApiKeyExpiry), não uma data.
      */
     private function validateKeyForm(): void
     {
         $this->validate([
             'name' => ['required', 'string', 'max:100'],
-            'expiresAt' => ['nullable', 'date', 'after:now'],
+            // A validade escolhida: sem validade, N horas ou N dias.
+            ...ApiKeyExpiry::rules($this->expiryUnit, 'expiryUnit', 'expiryAmount'),
             'selectedScopes' => ['array'],
             'selectedScopes.*' => ['string', 'regex:'.StoreApiKeyRequest::SCOPE_REGEX],
             'selectedProjectUuids' => ['array'],
@@ -327,7 +431,8 @@ final class Index extends Component
             'selectedScopes.*.regex' => __('api_keys.scopes.invalid_format'),
         ], [
             'name' => __('panel.common.name'),
-            'expiresAt' => __('panel.api_keys.expires_at'),
+            'expiryUnit' => __('panel.api_keys.expires_at'),
+            'expiryAmount' => __('panel.api_keys.expiry_amount'),
         ]);
 
         if (! $this->allScopes && $this->selectedScopes === []) {
@@ -346,9 +451,7 @@ final class Index extends Component
         $result = $apiKeys->create($this->user(), [
             'name' => $this->name,
             'scopes' => $this->allScopes ? null : array_values($this->selectedScopes),
-            'expires_at' => $this->expiresAt !== null && $this->expiresAt !== ''
-                ? Carbon::parse($this->expiresAt)->toDateTimeString()
-                : null,
+            'expires_at' => ApiKeyExpiry::resolve($this->expiryUnit, $this->expiryAmount)?->toIso8601String(),
             'project_uuids' => $this->selectedProjectUuids !== [] ? array_values($this->selectedProjectUuids) : null,
         ]);
 
@@ -357,7 +460,7 @@ final class Index extends Component
         $this->revealedPublicKey = $result['api_key']->public_key;
         $this->revealedSecretKey = $result['secret_key'];
 
-        $this->reset('name', 'expiresAt', 'selectedScopes', 'selectedProjectUuids');
+        $this->reset('name', 'expiryUnit', 'expiryAmount', 'selectedScopes', 'selectedProjectUuids');
         $this->allScopes = true;
         $this->showCreateForm = false;
     }
@@ -412,6 +515,16 @@ final class Index extends Component
     private function authorizeManage(ApiKeyAttempt $attempt, ?string $keyUuid = null): void
     {
         $this->guard()->authorize(AccountAbility::ManageApiKeys, $attempt, $keyUuid);
+    }
+
+    private function confirmingCreation(): bool
+    {
+        return $this->pendingAction === 'create';
+    }
+
+    private function creationConfirmation(): ApiKeyCreationConfirmation
+    {
+        return app(ApiKeyCreationConfirmation::class);
     }
 
     private function guard(): AccountResourceGuard

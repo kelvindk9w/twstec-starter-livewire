@@ -42,6 +42,12 @@ const ISOLATION_SYSTEM_MODE_REVIEWED = [
     // O link de convite não diz de que conta é o convite: achar pelo hash do
     // token e marcá-lo como aceito/recusado (um ponto só).
     'vendor/twstec/kit-accounts/src/Account/Invitations/InvitationTokens.php' => 1,
+    // Chaves de SESSÃO: a sessão que termina (logout, outros aparelhos,
+    // troca de senha, bloqueio) pode ter chaves em contas que não são a
+    // atual — ou nem há conta atual (logout); marcar a sessão vista; a rotina
+    // agendada que revoga as de sessão vencida e apaga as que já não valem,
+    // de todas as contas; e a revogação em si (5 pontos, cada um com motivo).
+    'vendor/twstec/kit-accounts/src/ApiKeys/Sessions/SessionApiKeys.php' => 5,
     // Uploads (F8c). A foto de perfil é da PESSOA, não de uma conta: gravar
     // a foto pessoal (sem conta) e lê-la — restrita ao upload apontado pela
     // própria pessoa, foto pessoal ou da conta pessoal dela.
@@ -148,15 +154,27 @@ function isolationWithoutComments(string $codigo): string
 }
 
 /**
+ * Atalhos que pulam escopo global e são LIBERADOS, com o motivo: tirar o
+ * escopo das CHAVES DE SESSÃO (Scopes\SessionKeyScope do twstec/kit-accounts,
+ * que as esconde das listas e contagens) — o escopo da conta continua
+ * valendo. Só a chamada exata, pela classe do escopo; qualquer outra forma
+ * reprova.
+ */
+const ISOLATION_SCOPE_BYPASS_ALLOWED = [
+    'withoutGlobalScope(SessionKeyScope::class)',
+];
+
+/**
  * @return list<string>
  */
 function isolationViolations(string $codigo): array
 {
     $texto = isolationWithoutComments($codigo);
+    $semLiberados = str_replace(ISOLATION_SCOPE_BYPASS_ALLOWED, '', $texto);
     $violacoes = [];
 
     foreach (['withoutGlobalScope', 'newQueryWithoutScopes', 'newModelQuery', '->getQuery()'] as $atalho) {
-        if (str_contains($texto, $atalho)) {
+        if (str_contains($semLiberados, $atalho)) {
             $violacoes[] = "usa {$atalho}";
         }
     }
@@ -305,6 +323,10 @@ it('a trava não é cega: pega cada atalho e cada chamada, e ignora comentário'
         ->and(isolationViolations("<?php DB::table('api_keys')->where('id', 1)->update([]);"))->toBe(['consulta crua em api_keys'])
         ->and(isolationViolations("<?php DB::select('SELECT * FROM projects WHERE id = 1');"))->toBe(['SQL literal em projects'])
         ->and(isolationViolations("<?php // withoutGlobalScopes e DB::table('projects')\n\$a = 1;"))->toBe([])
+        // Só o escopo das chaves de sessão é liberado — o da conta, nunca.
+        ->and(isolationViolations('<?php $q->withoutGlobalScope(SessionKeyScope::class);'))->toBe([])
+        ->and(isolationViolations('<?php $q->withoutGlobalScope(AccountScope::class);'))->toBe(['usa withoutGlobalScope'])
+        ->and(isolationViolations('<?php $q->withoutGlobalScope(SessionKeyScope::class)->withoutGlobalScopes();'))->toBe(['usa withoutGlobalScope'])
         ->and(isolationStaticCalls("<?php Accounts::asSystem('x', fn () => 1); Accounts::asSystem(\$y, fn () => 1);", 'asSystem'))
         ->toBe(['total' => 2, 'sem_motivo' => 1])
         ->and(isolationStaticCalls("<?php \$t = 'Accounts::actingAs(\$c)'; Accounts::actingAs(\$c, fn () => 1);", 'actingAs')['total'])->toBe(1);

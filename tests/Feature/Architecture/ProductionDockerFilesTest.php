@@ -151,3 +151,13 @@ it('o nome do produto em produção é obrigatório, sem padrão do kit, e APP_N
     expect($compose)->toContain('PLATFORM_PRIMARY_COLOR: ${PROD_PLATFORM_PRIMARY_COLOR:-}')
         ->and(file_get_contents(kitConfigFile('platform')))->toContain("'primary_color' => env('PLATFORM_PRIMARY_COLOR'),");
 });
+
+it('o nginx de produção não desfaz a Referrer-Policy mais restrita de uma rota: repassa a do aplicativo, num cabeçalho só', function (): void {
+    $conf = productionFile('docker/nginx/prod.conf');
+
+    // Nada de valor fixo: com dois cabeçalhos, o navegador fica com o último.
+    expect($conf)->not->toMatch('/add_header\s+Referrer-Policy\s+"/')
+        ->and($conf)->toMatch('/map \$upstream_http_referrer_policy \$kit_referrer_policy \{\s*""\s+"strict-origin-when-cross-origin";\s*default \$upstream_http_referrer_policy;\s*\}/')
+        ->and($conf)->toMatch('/add_header Referrer-Policy \$kit_referrer_policy always;/')
+        ->and($conf)->toContain('fastcgi_hide_header Referrer-Policy;');
+});

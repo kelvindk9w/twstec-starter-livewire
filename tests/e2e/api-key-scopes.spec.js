@@ -53,7 +53,15 @@ test.describe('chaves de API: escopos e projetos marcados', () => {
         const confirmSensitive = async () => {
             const modal = page.locator('#sensitive-action');
             await expect(modal).toBeVisible();
-            await modal.getByLabel('Senha de transação').fill(transactionPassword);
+
+            // No ambiente `test` (API_KEYS_ENVIRONMENT), criar chave pede só o
+            // código: o modal vem sem o campo da senha de transação.
+            const password = modal.getByLabel('Senha de transação');
+
+            if ((await password.count()) > 0) {
+                await password.fill(transactionPassword);
+            }
+
             await modal.getByRole('button', { name: 'Enviar código por e-mail' }).click();
             const code = codeFrom(await waitForMessage(request, address, seen, hasCode));
             await modal.getByLabel('Código de verificação').fill(code);
