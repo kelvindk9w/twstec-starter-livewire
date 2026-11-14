@@ -89,12 +89,19 @@ it('rejeita chave revogada, expirada por data ou com usuário bloqueado/pendente
         // Pendente = bloqueada (deny-by-default: só Active opera, igual ao
         // login e ao painel web — ver EnsureAccountIsActive).
         'usuario pendente' => $user->forceFill(['status' => UserStatus::Pending])->save(),
+        // E-mail do dono sem confirmação (verificação exigida): a conta não
+        // opera pela API — regra única Account::isOperational().
+        'e-mail do dono pendente' => (function () use ($user) {
+            config()->set('auth.email_verification.required', true);
+
+            return $user->forceFill(['email_verified_at' => null])->save();
+        })(),
     };
 
     $this->getJson('/api/v1/_test/tenant', headersApi($key, $secret))
         ->assertUnauthorized()
         ->assertJsonPath('error.message', __('api_keys.auth.invalid'));
-})->with(['revogada', 'expirada', 'usuario bloqueado', 'usuario pendente']);
+})->with(['revogada', 'expirada', 'usuario bloqueado', 'usuario pendente', 'e-mail do dono pendente']);
 
 it('rejeita chave inativa além do limite configurado (middleware checa inatividade)', function () {
     config()->set('api_keys.inactivity.months', 3);
