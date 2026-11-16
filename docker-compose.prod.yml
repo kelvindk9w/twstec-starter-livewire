@@ -12,11 +12,39 @@
 #   - migrate (one-shot), worker de fila e scheduler como containers dedicados;
 #   - volumes nomeados persistentes (reiniciar NUNCA reseta o banco).
 #
+# ANTES DO PRIMEIRO `up` (ver "VOLUME DO BANCO" abaixo e docs/producao.md,
+# "Volumes e o banco em produção"):
+#
+#   - SERVIDOR NOVO (nunca rodou este projeto): crie o volume do banco, uma vez
+#     só — `docker volume create <PROD_POSTGRES_VOLUME>`.
+#   - SERVIDOR QUE JÁ RODAVA O ARQUIVO ANTERIOR: NÃO crie volume — o banco já
+#     está no volume de hoje. Ache o nome do projeto e o do volume pelo passo 1
+#     de "Migrar uma instalação que já roda" (docs/producao.md) e defina
+#     PROD_COMPOSE_PROJECT_NAME e PROD_POSTGRES_VOLUME com eles. Criar um
+#     volume ali sobe uma SEGUNDA stack, com um banco VAZIO.
+#
 # PACOTES DO KIT: vêm do Composer (Packagist), como qualquer dependência; o
 # build é o do docker/php/Dockerfile (ver o cabeçalho dele).
 #
 # BANCO: o nome padrão (PROD_POSTGRES_DB) é o do projeto — o instalador o
 # grava na criação; troque-o no .env.prod, se quiser outro.
+#
+# NOME DO PROJETO FIXO (`name:`, logo abaixo; PROD_COMPOSE_PROJECT_NAME, com o
+# nome do projeto como padrão — o instalador o grava na criação): sem ele, o
+# Compose usava o nome da PASTA, e subir de outra pasta (um clone novo, a pasta
+# renomeada, uma pasta por versão) criava OUTRA stack. Não ponha
+# COMPOSE_PROJECT_NAME no .env do servidor nem use `-p`: os dois passam por
+# cima do `name:`.
+#
+# VOLUME DO BANCO EXTERNO E COM NOME FIXO (PROD_POSTGRES_VOLUME; padrão
+# <nome do projeto>_postgres_data, o nome que o Compose dava ao volume quando o
+# projeto rodava com esse nome): o Compose NÃO o cria nem o apaga (nem no
+# `down -v`). Sem o volume, o `up` falha com `external volume "..." not found`
+# — antes, ele criava um volume vazio e o PostgreSQL subia um banco novo, sem
+# aviso, com o banco de verdade esquecido no volume antigo. Num servidor que
+# JÁ RODA, esse erro quer dizer que o nome não é o do volume de hoje: não crie
+# volume, ache o certo (ver acima). Mudar o nome depois do primeiro deploy é
+# apontar para outro banco: nunca.
 #
 # CONFIGURAÇÃO: as variáveis PROD_* abaixo podem ser definidas num arquivo
 # .env.prod (ver .env.prod.example) ou no ambiente do shell. Onde a variável
@@ -53,6 +81,8 @@
 # ATENÇÃO: o Compose SEMPRE usa o .env da raiz para interpolar ${VAR} — por
 # isso aqui só existem nomes PROD_* (nunca presentes no .env de dev).
 # =============================================================================
+
+name: ${PROD_COMPOSE_PROJECT_NAME:-tws-starter}
 
 # Ambiente compartilhado dos containers PHP (app, queue, scheduler, migrate).
 x-app-env: &app-env
@@ -194,6 +224,10 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+    # Teto de memória deste container (0 = sem teto, o padrão: o kit não sabe
+    # o tamanho do servidor). Com teto, o excesso para aqui, e não no banco.
+    # Ver docs/producao.md, "Memória dos serviços PHP".
+    mem_limit: ${PROD_APP_MEMORY_LIMIT:-0}
     restart: unless-stopped
     networks:
       - backend
@@ -253,13 +287,67 @@ services:
 
   postgres:
     image: postgres:18-alpine
+    # UM SERVIDOR POR VOLUME: antes do entrypoint da imagem, uma trava (flock)
+    # num arquivo do volume, mantida pelo PostgreSQL enquanto ele roda. Um
+    # segundo servidor no mesmo volume — `docker compose run postgres` sem
+    # comando, `--scale postgres=2`, outra stack apontando para o mesmo volume
+    # — é RECUSADO na hora, em vez de subir e corromper o banco. O PostgreSQL
+    # não se protege disso sozinho: cada container tem o próprio espaço de
+    # processos, e o postmaster.pid não serve de trava entre containers.
+    # Comando que não é o servidor (`run --rm postgres psql ...`) passa direto.
+    # A trava some com o processo: não sobra trava velha depois de um `kill`.
+    entrypoint:
+      - sh
+      - -c
+      - |
+        case "$${1:-}" in
+          postgres | -*)
+            exec 9>>/var/lib/postgresql/.postgres-server.lock
+            if ! flock -n 9; then
+              echo "[postgres] RECUSADO: outro servidor PostgreSQL ja usa este volume (docs/producao.md)." >&2
+              exit 1
+            fi
+            ;;
+        esac
+        exec docker-entrypoint.sh "$$@"
+      - postgres-volume-lock
+    # O `entrypoint` acima apaga o comando padrão da imagem: ele volta aqui.
+    command: [postgres]
+    # Tempo para o desligamento limpo (a imagem para o PostgreSQL com SIGINT, o
+    # "fast shutdown", que grava um checkpoint antes de sair). O padrão do
+    # Docker, 10 s, mata o processo no meio de um checkpoint grande, e a subida
+    # seguinte passa pela recuperação de falha.
+    stop_grace_period: ${PROD_POSTGRES_STOP_GRACE_PERIOD:-2m}
+    # O /dev/shm do container (padrão do Docker: 64 MB). O PostgreSQL usa
+    # memória compartilhada POSIX nas consultas paralelas; pouco espaço = erro
+    # "could not resize shared memory segment ... No space left on device".
+    shm_size: ${PROD_POSTGRES_SHM_SIZE:-256mb}
+    # Memória acabando no servidor: o OOM killer do Linux escolhe quem matar, e
+    # matar o processo principal (postmaster) derruba o banco. -1000 o tira da
+    # lista; o PG_OOM_ADJUST_* abaixo devolve os processos filhos (as conexões)
+    # ao normal (0) — a configuração que a documentação do PostgreSQL indica
+    # ("Linux Memory Overcommit"). Os processos do `docker compose exec` aqui
+    # (healthcheck, psql, pg_dump) herdam o -1000: um psql que traz um
+    # resultado enorme faz o kernel matar OUTRO processo. Docker rootless
+    # ignora o valor e usa o do daemon: o `up` não quebra, a regra só não vale.
+    oom_score_adj: ${PROD_POSTGRES_OOM_SCORE_ADJ:--1000}
     environment:
       POSTGRES_DB: ${PROD_POSTGRES_DB:-tws_starter}
       POSTGRES_USER: ${PROD_POSTGRES_USER:-tws}
       POSTGRES_PASSWORD: ${PROD_POSTGRES_PASSWORD:?defina PROD_POSTGRES_PASSWORD (sem valor padrao - ver .env.prod.example)}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      PG_OOM_ADJUST_FILE: /proc/self/oom_score_adj
+      PG_OOM_ADJUST_VALUE: "0"
+      # O LAYOUT DO POSTGRESQL 18: o volume montado em /var/lib/postgresql (o
+      # VOLUME da imagem 18 — montar em /var/lib/postgresql/data deixava um
+      # volume anônimo a cada container) e os dados em <volume>/pgdata, o MESMO
+      # diretório do layout anterior (volume em /var/lib/postgresql/data com
+      # PGDATA=/var/lib/postgresql/data/pgdata). Por isso o volume existente
+      # sobe sem mover nada. NUNCA troque só a montagem nem tire o PGDATA: nos
+      # dois casos o PostgreSQL não acha os dados e cria um banco NOVO e vazio,
+      # sem aviso (ver docs/producao.md, "Volumes e o banco em produção").
+      PGDATA: /var/lib/postgresql/pgdata
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     # SEM `ports:` — banco inacessível fora da rede interna.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PROD_POSTGRES_USER:-tws} -d ${PROD_POSTGRES_DB:-tws_starter}"]
@@ -307,6 +395,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Teto de memória deste container (0 = sem teto, o padrão: o kit não sabe
+    # o tamanho do servidor). Com teto, o excesso para aqui, e não no banco.
+    # Ver docs/producao.md, "Memória dos serviços PHP".
+    mem_limit: ${PROD_WORKER_MEMORY_LIMIT:-0}
     restart: unless-stopped
     networks:
       - backend
@@ -326,6 +418,10 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    # Teto de memória deste container (0 = sem teto, o padrão: o kit não sabe
+    # o tamanho do servidor). Com teto, o excesso para aqui, e não no banco.
+    # Ver docs/producao.md, "Memória dos serviços PHP".
+    mem_limit: ${PROD_SCHEDULER_MEMORY_LIMIT:-0}
     restart: unless-stopped
     networks:
       - backend
@@ -335,6 +431,14 @@ networks:
     driver: bridge
 
 volumes:
+  # O BANCO: externo e com nome fixo (ver o cabeçalho, "VOLUME DO BANCO
+  # EXTERNO"). O Compose não o cria — `docker volume create` uma vez, no
+  # provisionamento — e nunca o apaga, nem no `down -v`.
   postgres_data:
+    name: ${PROD_POSTGRES_VOLUME:-tws-starter_postgres_data}
+    external: true
+  # Fila, sessões e cache (o registro de tudo fica no banco): do projeto, que
+  # tem nome fixo; o Compose o cria na primeira subida.
   redis_data:
+  # O public/ da imagem, sincronizado pelo app a cada subida: nenhum estado.
   app_public:

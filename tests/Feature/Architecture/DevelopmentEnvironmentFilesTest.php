@@ -12,6 +12,8 @@ declare(strict_types=1);
 //   do próprio Vite e a página do projeto fica em branco;
 // - o banco da suíte PostgreSQL é <DB_DATABASE>_test no db-init do compose
 //   (o instalador grava o mesmo nome no phpunit.pgsql.xml);
+// - o PostgreSQL usa o layout do 18 que lê o volume existente (montagem em
+//   /var/lib/postgresql e os dados em <volume>/pgdata);
 // - o desenvolvimento usa 30 nas rotas sensíveis (a suíte E2E), e a produção
 //   continua com 5;
 // - o CI base: gatilho manual e semanal, só leitura, ações fixadas por commit,
@@ -58,6 +60,20 @@ it('o banco da suíte PostgreSQL do db-init é <DB_DATABASE>_test', function ():
     preg_match('/<env name="DB_DATABASE" value="([^"]+)"/', (string) file_get_contents(base_path('phpunit.pgsql.xml')), $match);
 
     expect($match[1] ?? '')->toEndWith('_test');
+});
+
+it('o PostgreSQL de desenvolvimento usa o layout do 18 que lê o volume existente (montagem em /var/lib/postgresql e os dados em pgdata)', function (): void {
+    if (! developmentPostgres()) {
+        test()->markTestSkipped('Projeto criado com SQLite: sem o PostgreSQL no compose.');
+    }
+
+    $compose = developmentFile('compose.yaml', 'docker/dev/compose.yaml');
+
+    // Os dados ficam em <volume>/pgdata, como no layout anterior: trocar só a
+    // montagem, ou tirar o PGDATA, criaria um banco novo e vazio.
+    expect($compose)->toMatch('/^\s+PGDATA: \/var\/lib\/postgresql\/pgdata$/m')
+        ->toMatch('/^\s+- postgres_data:\/var\/lib\/postgresql$/m')
+        ->not->toMatch('/^\s+[^#\s].*\/var\/lib\/postgresql\/data/m');
 });
 
 it('rotas sensíveis: 30 no desenvolvimento (o .env.example), 5 na produção', function (): void {

@@ -48,8 +48,14 @@ projeto (abaixo), em que as migrations rodam no primeiro `docker compose up
 Detalhes em
 [docs/instalacao.md](https://github.com/kelvindk9w/tws-laravel-starter-kit/blob/desenvolvimento/docs/instalacao.md).
 
-**Produção:** `docker compose -f docker-compose.prod.yml up -d --build`, com o
-`.env.prod` a partir do `.env.prod.example`. A imagem do app
+**Produção:** num servidor novo, uma vez,
+`docker volume create <nome do projeto>_postgres_data` (o volume do banco é
+externo: sem ele, o `up` falha em vez de subir um banco vazio); depois,
+`docker compose -f docker-compose.prod.yml up -d --build`, com o `.env.prod` a
+partir do `.env.prod.example`. **Servidor que já rodava o arquivo anterior: NÃO
+crie volume** — o banco já está no volume de hoje; ache o nome pelo passo 1 de
+"Migrar uma instalação que já roda" (docs/producao.md) e defina
+`PROD_COMPOSE_PROJECT_NAME`/`PROD_POSTGRES_VOLUME`. A imagem do app
 (`docker/php/Dockerfile`, target `prod`) instala os pacotes do kit pelo
 Composer, como qualquer dependência — ver
 [docs/producao.md](https://github.com/kelvindk9w/tws-laravel-starter-kit/blob/desenvolvimento/docs/producao.md).

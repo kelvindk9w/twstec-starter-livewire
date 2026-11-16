@@ -10,7 +10,8 @@ declare(strict_types=1);
 //   Docker passa por cima do firewall da máquina);
 // - nenhuma senha padrão: PostgreSQL e Redis exigem DB_PASSWORD e
 //   REDIS_PASSWORD (o scripts/preparar-dev gera as duas no .env da raiz), e
-//   os containers PHP dos dois starters recebem as mesmas.
+//   os containers PHP dos dois starters recebem as mesmas;
+// - o PostgreSQL usa o layout do 18 que lê o volume existente.
 //
 // Este arquivo NÃO vai para o projeto criado (export-ignore no .gitattributes
 // do starter): lá não há o monorepo em volta. No container app do monorepo
@@ -67,4 +68,14 @@ it('o compose da raiz não tem senha padrão: PostgreSQL e Redis exigem as do .e
         ->and((string) file_get_contents($script))->toContain('DB_PASSWORD=$db_password')
         ->toContain('REDIS_PASSWORD=$(random_secret)')
         ->toContain('umask 077');
+});
+
+it('o PostgreSQL da raiz usa o layout do 18 que lê o volume existente (o banco de quem já clonou o kit continua)', function (): void {
+    $compose = monorepoFile('docker-compose.yml');
+
+    expect($compose)->toMatch('/^\s+PGDATA: \/var\/lib\/postgresql\/pgdata$/m')
+        ->toMatch('/^\s+- postgres_data:\/var\/lib\/postgresql$/m')
+        ->not->toMatch('/^\s+[^#\s].*\/var\/lib\/postgresql\/data/m')
+        // O nome do projeto continua fixo: o volume é o mesmo de sempre.
+        ->toMatch('/^name: tws-laravel-starter-kit$/m');
 });

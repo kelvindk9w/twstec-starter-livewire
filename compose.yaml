@@ -148,9 +148,14 @@ services:
       POSTGRES_DB: ${DB_DATABASE:?defina DB_DATABASE no .env (o instalador grava)}
       POSTGRES_USER: ${DB_MIGRATION_USERNAME:?defina DB_MIGRATION_USERNAME no .env - o papel de migracao, ver o .env.example}
       POSTGRES_PASSWORD: ${DB_MIGRATION_PASSWORD:?defina DB_MIGRATION_PASSWORD no .env - a senha do papel de migracao, ver o .env.example}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      # O layout do PostgreSQL 18: o volume em /var/lib/postgresql (o VOLUME
+      # da imagem; sem volume anônimo a mais) e os dados em <volume>/pgdata,
+      # o mesmo diretório do layout anterior — o banco que já existe sobe
+      # sem mover nada. Nunca troque só a montagem nem tire o PGDATA: o
+      # PostgreSQL criaria um banco novo e vazio, sem aviso.
+      PGDATA: /var/lib/postgresql/pgdata
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 3s
